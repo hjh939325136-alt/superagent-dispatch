@@ -1,0 +1,11 @@
+# Synthetic coordinator for the systemd service. Workers execute components.
+db_path = "/var/lib/sa-dispatch/dispatch.sqlite3"
+artifact_root = "/var/lib/sa-dispatch/artifacts"
+journal_dir = "/var/lib/sa-dispatch/journal"
+device_id = "coordinator"
+capabilities = []
+plugins = ["hotspot"]
+synthetic = true
+lease_ttl_seconds = 60
+component_timeout_seconds = 10
+components = {}

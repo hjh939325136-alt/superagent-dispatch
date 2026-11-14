@@ -1,0 +1,28 @@
+[Unit]
+Description=SuperAgent Dispatch synthetic task coordinator
+After=local-fs.target
+
+[Service]
+Type=exec
+User=sa-dispatch
+Group=sa-dispatch
+StateDirectory=sa-dispatch
+StateDirectoryMode=0700
+WorkingDirectory=/opt/sa-dispatch/current
+ExecStart=/usr/bin/flock --shared --nonblock --no-fork /var/lib/sa-dispatch /usr/bin/python3 -B -m sa_dispatch --config /etc/sa-dispatch/coordinator.toml serve --identities /etc/sa-dispatch/identities.json --port 8765
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

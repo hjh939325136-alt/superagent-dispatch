@@ -1,0 +1,23 @@
+{
+  "tracks": ["ai-practice", "game"],
+  "items": [
+    {
+      "ref": {
+        "owner": "signal_hub",
+        "kind": "radar_card",
+        "id": "synthetic-radar-1",
+        "version": "0a949e5a4cc20db5a825daa1cc84be9c7a7af45e19d9821d0a34013ddcc6545ce",
+        "access_level": "restricted",
+        "usage_restrictions": ["local_only"]
+      },
+      "track": "ai-practice",
+      "kind": "topic",
+      "title": "Synthetic notebook workflow",
+      "summary": "Compare two invented notebook organization approaches.",
+      "observed_at": "2026-01-01T00:00:00+00:00",
+      "visibility": "local_only",
+      "status": "candidate",
+      "limitations": ["Synthetic evidence generated for tests"]
+    }
+  ]
+}

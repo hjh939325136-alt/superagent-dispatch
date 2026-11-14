@@ -1,0 +1,13 @@
+{
+  "devices": {
+    "example-dispatcher": {
+      "token_sha256": "REPLACE_WITH_SHA256_OF_DISPATCHER_TOKEN",
+      "roles": ["dispatcher"]
+    },
+    "example-worker": {
+      "token_sha256": "REPLACE_WITH_SHA256_OF_WORKER_TOKEN",
+      "roles": ["worker"],
+      "capabilities": ["component:mgmtcore"]
+    }
+  }
+}

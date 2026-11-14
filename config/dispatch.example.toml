@@ -1,0 +1,21 @@
+# Windows 合成试跑模板。先替换路径，再保存为机器专用 dispatch.toml。
+db_path = "D:/sa-dispatch-synthetic/dispatch.sqlite3"
+artifact_root = "D:/sa-dispatch-synthetic/artifacts"
+journal_dir = "D:/sa-dispatch-synthetic/journal"
+device_id = "fixture-win"
+capabilities = ["component:mgmtcore"]
+plugins = ["hotspot"]
+synthetic = true
+
+# 合成试跑起点。真实组件的预算须结合调用链与租约另行核定。
+lease_ttl_seconds = 60
+component_timeout_seconds = 10
+
+[components.mgmtcore]
+argv = [
+  "C:/path/to/python.exe",
+  "C:/path/to/SuperAgent/dispatch/tests/fakes/fake_component.py",
+  "--data-dir",
+  "D:/sa-dispatch-synthetic/component",
+]
+platform = "win32"
