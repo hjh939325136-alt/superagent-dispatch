@@ -3,12 +3,11 @@
 from hashlib import sha256
 import json
 from pathlib import Path
-from queue import Queue
 from secrets import token_urlsafe
 import subprocess
 import sys
 import tempfile
-from threading import Thread
+import time
 import unittest
 
 
@@ -42,15 +41,20 @@ class CoordinatorServiceTest(unittest.TestCase):
                 "--identities", str(self.identities), "--port", "0"]
 
     def start(self):
-        process = subprocess.Popen(self.command(), cwd=ROOT, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.PIPE, text=True)
+        startup_log = self.enterContext(tempfile.NamedTemporaryFile(dir=self.directory, delete=False))
+        process = subprocess.Popen(self.command(), cwd=ROOT, stdout=startup_log, stderr=subprocess.STDOUT)
         self.addCleanup(self.stop, process)
-        line = Queue()
-        reader = Thread(target=lambda: line.put(process.stderr.readline()), daemon=True)
-        reader.start()
-        ready = line.get(timeout=10)
-        self.assertRegex(ready, r"Coordinator listening on 127\.0\.0\.1:\d+")
-        return process, ready.strip().rsplit(":", 1)[1]
+        startup_log.close()
+        prefix = "Coordinator listening on 127.0.0.1:"
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and process.poll() is None:
+            output = Path(startup_log.name).read_text(encoding="utf-8", errors="replace")
+            for line in output.splitlines():
+                if line.startswith(prefix) and line[len(prefix):].isdigit():
+                    return process, line[len(prefix):]
+            time.sleep(0.05)
+        output = Path(startup_log.name).read_text(encoding="utf-8", errors="replace")
+        self.fail(f"Coordinator did not become ready (exit {process.poll()}): {output[-2000:]}")
 
     @staticmethod
     def stop(process):
@@ -62,7 +66,6 @@ class CoordinatorServiceTest(unittest.TestCase):
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=10)
-            process.stderr.close()
 
     def smoke(self, port, action, role, *args):
         return subprocess.run([sys.executable, "-B", "deploy/smoke-coordinator.py", "--port", port, action,

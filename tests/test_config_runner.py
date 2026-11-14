@@ -97,7 +97,7 @@ cwd = {literal(self.root)}
             self.assertEqual(synthetic.run_component("test", request).json["failure_mode"], "exit5")
         self.assertEqual(result.exit, 0)
         self.assertEqual(result.json["request"], request)
-        self.assertEqual(Path(result.json["cwd"]), self.root)
+        self.assertTrue(Path(result.json["cwd"]).samefile(self.root))
         self.assertFalse(Path(result.json["path"]).exists())
         self.assertIsNone(result.json["failure_mode"])
 
