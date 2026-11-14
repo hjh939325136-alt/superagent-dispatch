@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 import ipaddress
 import json
 import re
@@ -250,4 +251,11 @@ def create_server(api, host='127.0.0.1', port=0, *, max_body_bytes=262144):
         do_GET=dispatch
         do_POST=dispatch
 
-    return ThreadingHTTPServer((host,port),Handler)
+    class LoopbackServer(ThreadingHTTPServer):
+        def server_bind(self):
+            # HTTPServer.server_bind resolves the hostname even for a literal
+            # address. This listener has no DNS dependency.
+            TCPServer.server_bind(self)
+            self.server_name, self.server_port = self.server_address[:2]
+
+    return LoopbackServer((host,port),Handler)

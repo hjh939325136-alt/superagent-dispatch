@@ -16,6 +16,11 @@ from sa_dispatch.store_sqlite import SqliteStore
 from sa_dispatch.transport import CoordinatorAPI,create_server,TransportError
 
 class TransportTests(unittest.TestCase):
+    def test_literal_loopback_startup_does_not_resolve_dns(self):
+        with patch('socket.getfqdn', side_effect=AssertionError('unexpected hostname lookup')):
+            with create_server(self.api) as server:
+                self.assertEqual(server.server_name, '127.0.0.1')
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.clock=FakeClock()
