@@ -1,47 +1,42 @@
 # SuperAgent M0 源码预览
 
-[English（早期预览）](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md) · [预览说明](M0_PREVIEW.md) · [开发更新](DEVELOPMENT_UPDATES.md) · [稳定版 v0.1.0 中文说明](https://github.com/hjh939325136-alt/superagent-dispatch#readme)
+**简体中文** · [English](README.en.md)
 
-M0 是 SuperAgent 的早期源码预览。在任务调度之外，它还提供几组本机演示。你可以查询样例项目记录、试走从资料检索到内容审核的流程，或者查看文件整理计划、试做备份和恢复。
+**SuperAgent 想让分散在不同工具里的工作有迹可查。** 比如你要用一批资料做一条短视频，可以先查找相关资料，接着生成草稿、交给人审核，回头再看草稿用了哪些资料、审核停在哪一步。
 
-## 这一版可以试什么
+这份 M0 预览可以在一台电脑上用样例跑通这条流程。调度器负责任务和状态，查询工具负责找资料和查结果，采集器把样例脚本生成、模拟审核等事件的摘要和引用汇入同一本任务账。重复同步不会追加重复事件。只想看单机任务调度时，从 [Dispatch v0.1.0 中文首页](https://github.com/hjh939325136-alt/superagent-dispatch/blob/main/README.md) 开始。
 
-- **查询格式更明确。** Manager 仍接受原来的 JSON 查询。调用方可以加上 `"schema_version":"0.1"`，成功和查询错误的 JSON 回复都会标明版本。
-- **可查到样例内容事件。** 内容演示把样例脚本生成和模拟审核等事件的摘要与引用汇入调度账本。重复同步不会追加重复记录，也不会复制原文或调用发布平台。
+## 选一个样例试用
 
-- **采集命令兼容旧请求。** Collector 的 `sync` 和 `adopt` 仍可用原来的 JSON，也接受版本 `0.1`。如果同步遇到来源记录缺失，会停在冻结状态，等待操作员检查。
-
-## 用样例跑一遍
-
-需要 Python 3.11 或更新版本及其 SQLite 模块。先进入预览仓库根目录，试跑调度器：
+需要 Python 3.11 或更新版本。进入这个预览版的源码目录，先试跑调度器：
 
 ```sh
 python -I -B superagent.py dispatch selftest
 ```
 
-再回到仓库的上一级目录运行下方命令。将 `superagent-dispatch` 换成你解压或克隆得到的目录名。每次运行请选新的本地输出目录。
+想看资料查询或内容流程，再回到源码的上一级目录。把 `superagent-dispatch` 换成实际的源码目录名，每次运行请选择新的本地输出目录：
 
 ```sh
 python -B "superagent-dispatch/superagent.py" manager-fixture --output "M0 manager fixture"
 python -B "superagent-dispatch/superagent.py" pipeline-fixture --output "M0 pipeline fixture"
 ```
 
-生成查询演示后，可以用附带的 JSON 提问。查询命令需要配置文件的绝对路径，`$PWD` 会带入当前目录。在 Bash 等支持输入重定向的 shell 中运行：
+查询样例生成后，可把附带的 JSON 交给查询工具。命令里的 `$PWD` 会提供当前目录的绝对路径。Bash 用法如下：
 
 ```sh
 python -B "superagent-dispatch/superagent.py" manager --binding "$PWD/M0 manager fixture/manager-binding.json" < "superagent-dispatch/examples/manager-query.json"
 ```
 
-PowerShell 请使用 UTF-8 管道：
+PowerShell 用法如下：
 
 ```powershell
 Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json" | python -B "superagent-dispatch/superagent.py" manager --binding "$PWD/M0 manager fixture/manager-binding.json"
 ```
 
-内容流程的 `report.json` 可以看到用了哪些资料、样例脚本从哪一步生成、模拟审核是否通过和撤销。演示使用程序生成的数据和模拟审核，接入真实资料、执行正式审核或发布需要单独验证。
+跑完内容流程后，打开输出目录中的 `report.json`，可以看到资料引用、样例草稿、模拟审核结果，以及哪些事件已汇入任务账。
 
-## 目前的进度
+## 当前进度
 
-当前公开源码可以在本机试跑。完整系统上线、服务器安装、24 小时连续运行、跨设备执行和真实数据库迁移仍待验证。演示配置里有本机生成的绝对路径，换机器或移动目录后请重新生成。真实凭据和业务数据请留在原系统。
+公开版在 Windows 和隔离 Debian 上跑过本机样例。演示用合成资料和模拟审核。现役服务尚未采用这些更新，完整系统上线、跨设备执行、24 小时连续运行和真实数据库迁移仍待验证。
 
-[预览说明](M0_PREVIEW.md)列出调度器测试、文件整理和部署模板。备份的目标配置、预检及恢复参数见 [英文进阶说明](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md#bound-synthetic-backup)。
+[预览技术说明](M0_PREVIEW.md) · [中文开发更新](DEVELOPMENT_UPDATES.md)

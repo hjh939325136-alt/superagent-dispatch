@@ -1,6 +1,6 @@
 # M0 预览说明
 
-[English（早期预览）](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/M0_PREVIEW.md) · [本机试用](README.md) · [开发更新](DEVELOPMENT_UPDATES.md)
+**简体中文** · [English](M0_PREVIEW.en.md) · [本机试用](README.md) · [开发更新](DEVELOPMENT_UPDATES.md)
 
 如果你想看调度、资料查询和内容流程如何在一台电脑上串起来，可以从这个预览开始。只想试任务调度，可以下载 [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0)，在它的仓库根目录运行 `python -B -m sa_dispatch`。两个版本都需要 Python 3.11 或更新版本。
 
