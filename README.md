@@ -1,26 +1,34 @@
 # SuperAgent Dispatch
 
-[English](https://github.com/hjh939325136-alt/superagent-dispatch/blob/v0.1.0/README.md) · [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0) · [M0 预览](https://github.com/hjh939325136-alt/superagent-dispatch/tree/preview/m0-source) · [开发更新](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/DEVELOPMENT_UPDATES.md)
+**简体中文** · [English](README.en.md)
 
-SuperAgent Dispatch 是一个用 Python 写的任务调度工具。一个项目要调用多个脚本或工具时，可以把任务交给 Dispatch，由它记录谁接了任务、任务执行到哪一步、最后拿到了什么结果。记录保存在本机的 SQLite 数据库里，方便事后查验。仓库附带一个内容处理示例，可以用来了解怎么接入自己的脚本。
+**SuperAgent 想解决的是：一项工作交给几个工具去做时，怎么知道谁接了、做到哪一步、结果在哪里？** Dispatch 是它的任务调度器。你的项目提交一项任务，能处理它的工具领取并执行，Dispatch 把状态和结果留在本机，方便你回查和接着处理。
+
+比如你在整理一批素材，可以让一个脚本生成候选清单，再让另一个工具处理选中的条目。如果中间卡住，可以回看哪个任务已完成、哪个还需要处理，以及已有结果在哪里。
+
+## 从哪里开始
+
+| 你想看什么 | 从这里开始 |
+| --- | --- |
+| 一台电脑上怎么派任务、记状态、查结果 | 本页的 Dispatch v0.1.0 自检 |
+| 怎么串起资料查询、样例脚本生成和模拟审核 | [M0 预览试用](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/README.md) |
+
+这个 GitHub 仓库提供源码和可以本机运行的样例。v0.1.0 已验证单机任务调度和样例交接。M0 预览展示更长的流程，完整系统上线、跨设备执行、24 小时运行和真实数据库迁移仍待验证。
 
 ## 在本机试用
 
-下载源码，用 Python 3.11 或更新版本，在仓库根目录运行。用 Python 是为了让同一套命令能在 Windows 和 Linux 上运行。SQLite 随 Python 一起使用，本机就能保存和查询任务记录，无需额外安装数据库服务。
+用 Python 3.11 或更新版本。在终端进入解压或克隆后的目录，运行下面第一条命令即可。第二条是可选的回归测试。
 
 ```sh
 python -B -m sa_dispatch selftest
 python -B -m unittest discover -s tests -v
 ```
 
-第一条命令在临时目录创建数据库，用示例数据跑完任务，再检查导出的任务记录能否在新库中读回。第二条运行回归测试，包括权限检查和进程重启后的行为。
+自检会用内置样例执行任务，并检查能否从导出的任务记录找回结果。它在临时目录使用 SQLite，无需额外运行数据库服务。
 
-## 现在能用到哪一步
+## 继续了解
 
-稳定版 v0.1.0 覆盖单机任务调度和样例任务交接。Linux 上可以按 [systemd 部署指南（英文）](deploy/README.md) 启动仅本机可访问的示例服务，检查服务重启以及备份能否恢复。SQLite 数据放在本地文件系统，每个数据库由一个调度进程管理。真实业务数据、访问凭据和运行配置由各自系统保管。
-
-真实设备接入、跨设备执行、整机重启后的恢复和真实数据库迁移仍待验证。更多查询、内容流程和备份演示见 [M0 预览](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/M0_PREVIEW.md)。
-
-## 接入自己的脚本
-
-可以从 [内容处理接入示例](sa_dispatch_hotspot/__init__.py) 开始。脚本读取 Dispatch 生成的 JSON 请求文件，完成后返回含原 `request_id` 的 JSON 响应。适配器如何注册、如何测试重复请求，以及如何处理执行结果暂时无法确认的写操作，见 [英文技术说明](https://github.com/hjh939325136-alt/superagent-dispatch/blob/v0.1.0/README.md#use-a-project-adapter)。
+- [v0.1.0 源码](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0)
+- [接入自己的脚本（英文技术说明）](README.en.md#connect-your-own-script)
+- [Linux 单机示例部署（英文）](deploy/README.md)
+- [中文开发更新](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/DEVELOPMENT_UPDATES.md)
