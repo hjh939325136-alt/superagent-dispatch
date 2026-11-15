@@ -28,6 +28,33 @@ class Executor:
             raise ValueError("invalid lease identity")
         return Path(self.config.journal_dir) / (lease.lease_id + ".jsonl")
 
+    def _local_kind(self, task):
+        """A shared journal/ledger is not authority to run another adapter."""
+        kind = self.kinds.get(task.kind)
+        if (kind is None or not getattr(kind, 'enabled', False)
+                or kind.version != task.kind_version
+                or getattr(kind, 'dedicated_runner', False)):
+            return None
+        return kind
+
+    def _owned_attempt(self, task, lease=None):
+        if self.store.route not in (None, 'local_synthetic'):
+            return False
+        try:
+            self.store.require_task_route(task)
+        except DispatchError:
+            return False
+        if self._local_kind(task) is None:
+            return False
+        attempts = self.store.list_leases(task.task_id) if lease is None else [
+            self.store.get_lease(lease.lease_id)]
+        return any(row is not None and row.task_id == task.task_id
+                   and row.device_id == self.config.device_id
+                   and row.fence == task.fence
+                   and (lease is None or row.fence == lease.fence
+                        and row.device_id == lease.device_id)
+                   for row in attempts)
+
     def log(self, lease, phase, **data):
         path = self.journal_path(lease)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +114,8 @@ class Executor:
         return request
 
     def run_once(self):
+        if self.store.route not in (None, 'local_synthetic'):
+            raise DispatchError('local executor cannot run an HTTP route task')
         self.store.sweep()
         runnable={name for name,kind in self.kinds.items() if not getattr(kind,'dedicated_runner',False)}
         lease = self.store.claim(self.config.device_id,kinds=runnable)
@@ -147,6 +176,8 @@ class Executor:
         return self.store.get_task(lease.task_id)
 
     def recover(self):
+        if self.store.route not in (None, 'local_synthetic'):
+            raise DispatchError('local executor cannot recover HTTP route tasks')
         from .models import Lease
         recovered = []
         for path in sorted(Path(self.config.journal_dir).glob("*.jsonl")):
@@ -163,6 +194,8 @@ class Executor:
             if lease.device_id != self.config.device_id:
                 continue
             task = self.store.get_task(lease.task_id)
+            if not self._owned_attempt(task, lease):
+                continue
             if task.status == "leased" and task.fence == lease.fence:
                 try:
                     if row["phase"] == "result" and row["exit"] == 0:
@@ -237,7 +270,8 @@ class Executor:
             return {'verdict': 'still_unknown'}
 
     def reconcile(self, task):
-        if task.status != "unknown" or not self.config.synthetic:
+        if (task.status != "unknown" or not self.config.synthetic
+                or not self._owned_attempt(task)):
             return {"verdict": "still_unknown"}
         kind = self.kinds[task.spec.kind]
         try:

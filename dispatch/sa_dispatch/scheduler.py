@@ -14,6 +14,7 @@ import sqlite3
 
 from .clock import timestamp
 from .models import DispatchError, TaskSpec
+from .routing import HTTP_ROUTE, RouteRejected, ledger_mode
 
 _UNSET = object()
 
@@ -68,8 +69,25 @@ class Scheduler:
         self.store = store
         self._sqlite_failures = 0
         self._sqlite_pause_until = None
-        with store._tx() as conn:
-            initialize_schema(conn)
+        self._require_scheduler_route(store.routing_mode())
+
+    def _require_scheduler_route(self, mode):
+        expected = HTTP_ROUTE if mode == 'mixed' else None
+        if self.store.route != expected:
+            raise RouteRejected('scheduler requires the HTTP route in mixed mode')
+
+    def _schedule_for_upsert(self, conn, schedule_id):
+        # IDs remain global, including historical NULL rows.
+        row = conn.execute('SELECT * FROM schedules WHERE id=?', (schedule_id,)).fetchone()
+        if row is not None and row['execution_route'] != self.store.route:
+            raise RouteRejected('schedule belongs to a different execution route')
+        return row
+
+    def _reserved_slots(self, conn, schedule_id):
+        # A globally unique schedule keeps its lifetime budget across activation.
+        # Frozen historical slots remain spent.
+        return conn.execute('SELECT COUNT(*) FROM schedule_firings WHERE schedule_id=?',
+                            (schedule_id,)).fetchone()[0]
 
     def _validate_template(self, template):
         spec = TaskSpec.from_dict(template) if isinstance(template, dict) else template
@@ -105,15 +123,16 @@ class Scheduler:
         try:
             spec = self._validate_template(task_template)
         except (ValueError, TypeError, KeyError, DispatchError):
-            with self.store._tx() as conn:
-                current = conn.execute('SELECT version FROM schedules WHERE id=?', (schedule_id,)).fetchone()
-                self._event(conn, {'id':schedule_id,'version':current['version'] if current else 1},
-                            'schedule.template_error', self.store._now(), 'upsert_template_rejected')
+            with self.store._tx(execution=True) as conn:
+                current = self._schedule_for_upsert(conn, schedule_id)
+                if current is not None or self.store.route is None:
+                    self._event(conn, {'id':schedule_id,'version':current['version'] if current else 1},
+                                'schedule.template_error', self.store._now(), 'upsert_template_rejected')
             raise
         encoded = json.dumps(asdict(spec), sort_keys=True, separators=(',', ':'), allow_nan=False)
-        with self.store._tx() as conn:
-            previous = conn.execute('SELECT * FROM schedules WHERE id=?', (schedule_id,)).fetchone()
-            used = conn.execute('SELECT COUNT(*) FROM schedule_firings WHERE schedule_id=?',(schedule_id,)).fetchone()[0]
+        with self.store._tx(execution=True) as conn:
+            previous = self._schedule_for_upsert(conn, schedule_id)
+            used = self._reserved_slots(conn, schedule_id)
             bound = (previous['max_slots'] if previous else None) if max_slots is _UNSET else max_slots
             if bound is not None and bound < used:
                 raise DispatchError('max_slots cannot be smaller than already reserved slots')
@@ -129,12 +148,14 @@ class Scheduler:
                     raise DispatchError('next fire must be after every reserved slot')
             version = previous['version'] + 1 if previous else 1
             conn.execute('''INSERT INTO schedules(id,interval_seconds,task_template,next_fire_at,
-                last_fire_key,enabled,version,catchup,max_catchup,max_slots) VALUES(?,?,?,?,NULL,?,?,?,?,?)
+                last_fire_key,enabled,version,catchup,max_catchup,max_slots,execution_route)
+                VALUES(?,?,?,?,NULL,?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET interval_seconds=excluded.interval_seconds,
                 task_template=excluded.task_template,next_fire_at=excluded.next_fire_at,enabled=excluded.enabled,
                 version=excluded.version,catchup=excluded.catchup,max_catchup=excluded.max_catchup,
                 max_slots=excluded.max_slots''',
-                         (schedule_id, interval_seconds, encoded, when, int(enabled and not exhausted), version, catchup, max_catchup,bound))
+                         (schedule_id, interval_seconds, encoded, when, int(enabled and not exhausted),
+                          version, catchup, max_catchup, bound, self.store.route))
             event_row={'id':schedule_id,'version':version}
             if previous and previous['max_slots'] is not None and bound is None:
                 self._event(conn,event_row,'schedule.bound_removed',self.store._now(),'max_slots_removed')
@@ -154,20 +175,22 @@ class Scheduler:
 
     def _link_rejected_task(self, conn, firing):
         """Retain crash-window task linkage and cancel only unpublished lab work."""
-        task = conn.execute('SELECT * FROM tasks WHERE idem_key=?', (firing['fire_key'],)).fetchone()
+        task = conn.execute('SELECT * FROM tasks WHERE idem_key=? AND execution_route IS ?',
+                            (firing['fire_key'], self.store.route)).fetchone()
         if task is None:
             return
-        conn.execute('UPDATE schedule_firings SET task_id=? WHERE fire_key=?',
-                     (task['task_id'], firing['fire_key']))
+        conn.execute('UPDATE schedule_firings SET task_id=? WHERE fire_key=? AND execution_route IS ?',
+                     (task['task_id'], firing['fire_key'], self.store.route))
         published = conn.execute('SELECT 1 FROM transport_handoffs WHERE task_id=?', (task['task_id'],)).fetchone()
         if not published and task['access'] == 'synthetic' and task['side_effect'] == 'none' and \
                 task['status'] in ('queued', 'waiting_device'):
             self.store._transition(conn, task, 'cancelled', 'schedule reservation rejected', 'scheduler')
 
     def _fail_firing(self, firing, now, code, *, transient=False):
-        with self.store._tx() as conn:
-            current = conn.execute('SELECT * FROM schedule_firings WHERE fire_key=?', (firing['fire_key'],)).fetchone()
-            if current['outcome'] != 'pending':
+        with self.store._tx(execution=True) as conn:
+            current = conn.execute('SELECT * FROM schedule_firings WHERE fire_key=? AND execution_route IS ?',
+                                   (firing['fire_key'], self.store.route)).fetchone()
+            if current is None or current['outcome'] != 'pending':
                 return
             failures = current['failure_count'] + 1
             rejected = not transient or failures >= 3
@@ -175,8 +198,9 @@ class Scheduler:
                 code = 'sqlite_retry_exhausted'
             retry_at = None if rejected else timestamp(datetime.fromisoformat(now) + timedelta(seconds=2 ** (failures - 1)))
             conn.execute('''UPDATE schedule_firings SET outcome=?,failure_count=?,next_attempt_at=?,
-                last_attempt_at=?,rejection_code=?,at=? WHERE fire_key=?''',
-                ('rejected' if rejected else 'pending', failures, retry_at, now, code, now, firing['fire_key']))
+                last_attempt_at=?,rejection_code=?,at=? WHERE fire_key=? AND execution_route IS ?''',
+                ('rejected' if rejected else 'pending', failures, retry_at, now, code, now,
+                 firing['fire_key'], self.store.route))
             if rejected:
                 self._link_rejected_task(conn, firing)
             self._event(conn, {'id':firing['schedule_id'],'version':firing['version']},
@@ -211,23 +235,29 @@ class Scheduler:
 
     def _tick(self, *, limit, synthetic_handoff):
         now = self.store._now()
-        with self.store._tx() as conn:
+        route = self.store.route
+        synthetic_handoff = synthetic_handoff or route == HTTP_ROUTE
+        with self.store._tx(execution=True) as conn:
             pending = conn.execute("""SELECT COUNT(*) FROM schedule_firings WHERE outcome='pending'
-                AND (next_attempt_at IS NULL OR next_attempt_at<=?)""", (now,)).fetchone()[0]
+                AND execution_route IS ? AND (next_attempt_at IS NULL OR next_attempt_at<=?)""",
+                (route, now)).fetchone()[0]
             capacity = max(0, limit - pending)
-            rows = conn.execute('SELECT * FROM schedules WHERE enabled=1 ORDER BY next_fire_at,id').fetchall()
+            rows = conn.execute('''SELECT * FROM schedules WHERE enabled=1 AND execution_route IS ?
+                ORDER BY next_fire_at,id''', (route,)).fetchall()
             for row in rows:
                 used = None
                 if row['max_slots'] is not None:
-                    used=conn.execute('SELECT COUNT(*) FROM schedule_firings WHERE schedule_id=?',(row['id'],)).fetchone()[0]
+                    used = self._reserved_slots(conn, row['id'])
                     if used>=row['max_slots']:
-                        conn.execute('UPDATE schedules SET enabled=0 WHERE id=?',(row['id'],))
+                        conn.execute('UPDATE schedules SET enabled=0 WHERE id=? AND execution_route IS ?',
+                                     (row['id'], route))
                         self._event(conn,row,'schedule.exhausted',now,'max_slots_reached')
                         continue
                 if row['last_tick_at'] and now < row['last_tick_at']:
                     self._event(conn, row, 'schedule.clock_skew', now, 'clock_before_last_tick')
                     continue
-                conn.execute('UPDATE schedules SET last_tick_at=? WHERE id=?', (now, row['id']))
+                conn.execute('UPDATE schedules SET last_tick_at=? WHERE id=? AND execution_route IS ?',
+                             (now, row['id'], route))
                 if row['next_fire_at'] > now or capacity == 0:
                     continue
                 try:
@@ -253,17 +283,20 @@ class Scheduler:
                     frozen['idem_key'] = key
                     outcome = 'pending' if index >= count - keep else 'skipped_catchup'
                     conn.execute('''INSERT INTO schedule_firings(fire_key,schedule_id,scheduled_at,
-                        task_template,task_id,version,outcome,at) VALUES(?,?,?,?,NULL,?,?,?)''',
-                        (key, row['id'], slot, json.dumps(frozen, sort_keys=True), row['version'], outcome, now))
+                        task_template,task_id,version,outcome,at,execution_route) VALUES(?,?,?,?,NULL,?,?,?,?)''',
+                        (key, row['id'], slot, json.dumps(frozen, sort_keys=True), row['version'], outcome,
+                         now, row['execution_route']))
                 next_at = timestamp(first + timedelta(seconds=count * row['interval_seconds']))
-                conn.execute('UPDATE schedules SET next_fire_at=?,last_fire_key=? WHERE id=?', (next_at, key, row['id']))
+                conn.execute('''UPDATE schedules SET next_fire_at=?,last_fire_key=?
+                    WHERE id=? AND execution_route IS ?''', (next_at, key, row['id'], route))
                 if used is not None and used+count>=row['max_slots']:
-                    conn.execute('UPDATE schedules SET enabled=0 WHERE id=?',(row['id'],))
+                    conn.execute('UPDATE schedules SET enabled=0 WHERE id=? AND execution_route IS ?',
+                                 (row['id'], route))
                     self._event(conn,row,'schedule.exhausted',now,'max_slots_reached')
                 capacity -= keep
             reserved = conn.execute('''SELECT * FROM schedule_firings WHERE outcome='pending'
-                AND (next_attempt_at IS NULL OR next_attempt_at<=?)
-                ORDER BY COALESCE(last_attempt_at,''),scheduled_at,fire_key LIMIT ?''', (now,limit)).fetchall()
+                AND execution_route IS ? AND (next_attempt_at IS NULL OR next_attempt_at<=?)
+                ORDER BY COALESCE(last_attempt_at,''),scheduled_at,fire_key LIMIT ?''', (route, now, limit)).fetchall()
         result = []
         for firing in reserved:
             try:
@@ -284,25 +317,42 @@ class Scheduler:
                 code = 'idempotency_conflict' if getattr(error, 'code', None) == 'E_IDEMPOTENCY_CONFLICT' else 'submission_rejected'
                 self._fail_firing(firing, now, code)
                 continue
-            with self.store._tx() as conn:
-                current = conn.execute('SELECT outcome FROM schedule_firings WHERE fire_key=?', (firing['fire_key'],)).fetchone()
+            with self.store._tx(execution=True) as conn:
+                current = conn.execute('''SELECT outcome FROM schedule_firings
+                    WHERE fire_key=? AND execution_route IS ?''', (firing['fire_key'], route)).fetchone()
+                if current is None:
+                    continue
                 if current['outcome'] == 'rejected':
                     self._link_rejected_task(conn, firing)
                     continue
+                self.store.require_task_route(task, conn=conn)
                 if synthetic_handoff:
                     conn.execute('INSERT OR IGNORE INTO transport_handoffs VALUES(?,?,?)',
                                  (task.task_id, 'scheduler', now))
-                conn.execute("UPDATE schedule_firings SET task_id=?,outcome='created',at=?,last_attempt_at=?,next_attempt_at=NULL WHERE fire_key=? AND outcome='pending'",
-                             (task.task_id, now, now, firing['fire_key']))
+                conn.execute("""UPDATE schedule_firings SET task_id=?,outcome='created',at=?,
+                    last_attempt_at=?,next_attempt_at=NULL WHERE fire_key=? AND outcome='pending'
+                    AND execution_route IS ?""", (task.task_id, now, now, firing['fire_key'], route))
             result.append({'fire_key': firing['fire_key'], 'task_id': task.task_id, 'deduplicated': reused})
         return result
 
     def firings(self):
         with closing(self.store._connect()) as conn:
-            return [dict(row) for row in conn.execute('SELECT * FROM schedule_firings ORDER BY scheduled_at,fire_key')]
+            conn.execute('BEGIN')
+            self._require_scheduler_route(ledger_mode(conn))
+            return self._firings(conn)
+
+    def _firings(self, conn):
+        return [dict(row) for row in conn.execute('''SELECT * FROM schedule_firings
+            WHERE execution_route IS ? ORDER BY scheduled_at,fire_key''', (self.store.route,))]
 
     def status(self):
         with closing(self.store._connect()) as conn:
-            return {'schedules': [dict(row) for row in conn.execute('SELECT * FROM schedules ORDER BY id')],
-                    'firings': [dict(row) for row in conn.execute('SELECT * FROM schedule_firings ORDER BY scheduled_at,fire_key')],
-                    'events': [dict(row) for row in conn.execute('SELECT * FROM schedule_events ORDER BY seq')]}
+            conn.execute('BEGIN')
+            self._require_scheduler_route(ledger_mode(conn))
+            schedules = conn.execute('SELECT * FROM schedules WHERE execution_route IS ? ORDER BY id',
+                                     (self.store.route,))
+            events = conn.execute('''SELECT e.* FROM schedule_events e
+                LEFT JOIN schedules s ON s.id=e.schedule_id WHERE s.execution_route IS ? ORDER BY e.seq''',
+                (self.store.route,))
+            return {'schedules': [dict(row) for row in schedules], 'firings': self._firings(conn),
+                    'events': [dict(row) for row in events]}

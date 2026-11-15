@@ -34,6 +34,7 @@ class Config:
     plugins: tuple[str, ...]
     components: Mapping[str, ComponentConfig]
     synthetic: bool = False
+    execution_route: str | None = None
 
 
 _ROOT_FIELDS = frozenset(Config.__dataclass_fields__)
@@ -108,10 +109,13 @@ def load_config(path: str | Path, *, allowed_plugins=_PLUGINS) -> Config:
     except (OSError, UnicodeError, ValueError):
         raise ConfigError("unable to read component configuration TOML") from None
 
-    _check_fields(data, _ROOT_FIELDS, _ROOT_FIELDS - {"synthetic"}, "configuration")
+    _check_fields(data, _ROOT_FIELDS, _ROOT_FIELDS - {"synthetic", "execution_route"}, "configuration")
     synthetic = data.get("synthetic", False)
     if type(synthetic) is not bool:
         raise ConfigError("synthetic must be a boolean")
+    route = data.get('execution_route')
+    if route is not None and (route not in ('http_synthetic', 'local_synthetic') or not synthetic):
+        raise ConfigError('execution_route requires a recognized synthetic route')
     plugins = _strings(data["plugins"], "plugins")
     if set(plugins) - set(allowed_plugins) or len(set(plugins)) != len(plugins):
         raise ConfigError("configuration contains an unregistered plugin")
@@ -139,4 +143,5 @@ def load_config(path: str | Path, *, allowed_plugins=_PLUGINS) -> Config:
         plugins=plugins,
         components=MappingProxyType(components),
         synthetic=synthetic,
+        execution_route=route,
     )

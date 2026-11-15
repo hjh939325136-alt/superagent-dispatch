@@ -172,7 +172,8 @@ class BundleV2Tests(unittest.TestCase):
         bundle.mkdir()
         files = {}
         for table in V1_TABLES:
-            blob = b''.join(receipt_bytes(row)+b'\n' for row in source[table])
+            blob = b''.join(receipt_bytes({key: value for key, value in row.items() if key != 'execution_route'})
+                            + b'\n' for row in source[table])
             (bundle/(table+'.jsonl')).write_bytes(blob)
             files[table+'.jsonl'] = sha256_ref(blob)
         artifacts = sorted({row['artifact_hash'] for row in source['evidence']})

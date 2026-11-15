@@ -1,6 +1,6 @@
-"""Portable settled-ledger v6 bundles, with lossless audit rows and inert schedules.
+"""Portable settled-ledger v7 bundles, with lossless audit rows and inert schedules.
 
-Frozen v1-v5 layouts remain readable. Host device registrations are explicitly excluded from
+Frozen v1-v6 layouts remain readable. Host device registrations are explicitly excluded from
 portable bundles. Full in-process snapshots include them. Pending reservations
 and nonterminal tasks are rejected rather than discarded or replayed on import.
 """
@@ -15,6 +15,8 @@ from .artifacts import ArtifactError, ArtifactStore
 from .canonical import sha256_ref
 from .executor import receipt_bytes
 from .models import DispatchError
+from .routing import (ROUTED_TABLES, ROUTES, _digest, ledger_mode, read_route_evidence,
+                      validate_binding_evidence, validate_mixed_records)
 
 
 V1_TABLES = {"tasks": "rowid", "leases": "task_id,fence", "events": "seq",
@@ -30,14 +32,16 @@ V3_TABLES = {**V2_TABLES, "control_budgets": "budget_id", "control_approvals": "
           "host_attempts": "task_id,fence", "host_events": "task_id,fence,seq"}
 V4_TABLES = {**V3_TABLES, "claude_attempts":"task_id,fence"}
 V5_TABLES = dict(V4_TABLES)
-TABLES = {**V5_TABLES, 'collector_cursors':'source_id,stream', 'collector_gaps':'gap_id'}
+V6_TABLES = {**V5_TABLES, 'collector_cursors':'source_id,stream', 'collector_gaps':'gap_id'}
+TABLES = {**V6_TABLES, 'ledger_mode': 'id', 'route_audit': 'seq'}
 SNAPSHOT_TABLES = {**TABLES, "devices": "device_id"}
 V1_FORMAT = "sa_dispatch.bundle.v1"
 V2_FORMAT = "sa_dispatch.bundle.v2"
 V3_FORMAT = "sa_dispatch.bundle.v3"
 V4_FORMAT = "sa_dispatch.bundle.v4"
 V5_FORMAT = "sa_dispatch.bundle.v5"
-FORMAT = "sa_dispatch.bundle.v6"
+V6_FORMAT = "sa_dispatch.bundle.v6"
+FORMAT = "sa_dispatch.bundle.v7"
 TERMINAL = {"succeeded", "no_new", "failed", "cancelled"}
 
 
@@ -65,16 +69,21 @@ def snapshot_records(conn, *, include_devices=True):
         raise DispatchError("snapshot does not support populated table: " + unknown)
     present = _present(conn)
     tables = SNAPSHOT_TABLES if include_devices else TABLES
-    return {table: [dict(row) for row in conn.execute(f"SELECT * FROM {table} ORDER BY {order}")]
-            if table in present else [] for table, order in tables.items()}
+    records = {table: [dict(row) for row in conn.execute(f"SELECT * FROM {table} ORDER BY {order}")]
+               if table in present else [] for table, order in tables.items()}
+    records['ledger_mode'] = [{'id': 1, 'mode': ledger_mode(conn)}]
+    for table in ROUTED_TABLES.keys() & tables.keys():
+        for row in records[table]:
+            row.setdefault('execution_route', None)
+    return records
 
 
-def ledger(path):
+def ledger(path, *, include_devices=False):
     with closing(sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN")
         try:
-            return snapshot_records(conn, include_devices=False)
+            return snapshot_records(conn, include_devices=include_devices)
         except DispatchError as exc:
             raise ArtifactError("E_EXPORT_BLOCKED", str(exc)) from exc
 
@@ -182,6 +191,20 @@ def portable(records, *, include_fixed_refs=True):
 
 def _artifact_inventory(records, store, *, legacy=False):
     hashes = set(portable(records,include_fixed_refs=not legacy))
+    for row in records.get('route_audit', []):
+        ref = row['evidence_ref']
+        if ref is None:
+            continue
+        proof = read_route_evidence(store, ref)
+        if row['action'] == 'activate':
+            if (set(proof) != {'schema','actor','ledger_hash','bindings_hash'}
+                    or proof['schema'] != 'sa_dispatch.mixed_activation.v1' or proof['actor'] != row['actor']
+                    or not _digest(proof['ledger_hash']) or not _digest(proof['bindings_hash'])):
+                raise DispatchError('invalid portable activation evidence')
+        else:
+            validate_binding_evidence(proof, row['object_table'], row['object_id'], row['execution_route'],
+                                      row['pre_state_hash'], row['fence'])
+        hashes.add(ref)
     # Only this known schema owns these four child artifacts. Do not recursively
     # scrape arbitrary hashes from component payloads or user-controlled text.
     proof_fields = ("first_result_hash", "second_result_hash",
@@ -258,14 +281,82 @@ def _normalize_snapshot(records):
     if not isinstance(records, dict):
         raise DispatchError("invalid snapshot tables")
     supplied = set(records)
-    legacy = set(V1_TABLES) | {"devices"}
-    if supplied not in (set(SNAPSHOT_TABLES), set(TABLES),set(V5_TABLES),set(V5_TABLES)|{'devices'}, set(V3_TABLES),set(V3_TABLES)|{'devices'},set(V2_TABLES), set(V2_TABLES)|{'devices'}, legacy, set(V1_TABLES)):
+    layouts = (TABLES, V6_TABLES, V5_TABLES, V3_TABLES, V2_TABLES, V1_TABLES)
+    if not any(supplied in (set(layout), set(layout) | {'devices'}) for layout in layouts):
         raise DispatchError("invalid snapshot tables")
     result = {name: records.get(name, []) for name in SNAPSHOT_TABLES}
     if any(not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
            for rows in result.values()):
         raise DispatchError("invalid snapshot records")
+    result = {name: [dict(row) for row in rows] for name, rows in result.items()}
+    _normalize_routes(result, current='ledger_mode' in supplied)
     return result
+
+
+def _normalize_routes(records, *, current):
+    mode = records['ledger_mode']
+    if not current:
+        mode = records['ledger_mode'] = [{'id': 1, 'mode': 'isolated'}]
+    if (len(mode) != 1 or set(mode[0]) != {'id', 'mode'} or type(mode[0]['id']) is not int
+            or mode[0]['id'] != 1 or mode[0]['mode'] not in ('isolated','mixed')):
+        raise DispatchError('invalid snapshot ledger mode')
+    mixed = mode[0]['mode'] == 'mixed'
+    for table in ROUTED_TABLES:
+        for row in records.get(table, []):
+            if ('execution_route' in row) != current:
+                raise DispatchError('execution route columns disagree with the snapshot format')
+            if not current:
+                row['execution_route'] = None
+            route = row['execution_route']
+            if route is not None and (not mixed or route not in ROUTES):
+                raise DispatchError('invalid snapshot execution route')
+    _validate_route_audit(records, mixed)
+    if mixed:
+        validate_mixed_records(records)
+
+
+def _validate_route_audit(records, mixed):
+    actions = records['route_audit']
+    if not mixed and actions:
+        raise DispatchError('isolated snapshots cannot carry mixed route audit')
+    activations = 0
+    identities = {}
+    for row in actions:
+        if set(row) != {'seq','action','object_table','object_id','execution_route','actor','at',
+                        'evidence_ref','pre_state_hash','fence'}:
+            raise DispatchError('invalid route audit columns')
+        action, table, route, fence = row['action'], row['object_table'], row['execution_route'], row['fence']
+        identity, ref, previous = row['object_id'], row['evidence_ref'], row['pre_state_hash']
+        if any(not isinstance(row[key], str) or not row[key] for key in ('object_id','actor','at')):
+            raise DispatchError('invalid route audit identity')
+        if action == 'activate' and table == 'ledger_mode' and identity == '1' and route is None and \
+                fence is None and previous is None and _digest(ref):
+            activations += 1
+        elif action == 'bind' and table in ROUTED_TABLES and route in ROUTES and _digest(ref) and \
+                _digest(previous) and ((type(fence) is int and fence >= 0) if table == 'tasks' else fence is None):
+            pass
+        elif action == 'register' and table == 'devices' and route in ROUTES and \
+                ref is None and previous is None and fence is None:
+            pass
+        elif action == 'disable' and table == 'devices' and route is None and \
+                ref is None and _digest(previous) and fence is None:
+            pass
+        else:
+            raise DispatchError('invalid route audit action')
+        if (table, identity) in identities:
+            raise DispatchError('duplicate route audit identity')
+        identities[table, identity] = route
+    if mixed and activations != 1:
+        raise DispatchError('mixed snapshot requires exactly one activation record')
+    for device in records.get('devices', []):
+        key = ('devices', device['device_id'])
+        if mixed and (key not in identities or identities[key] != device['execution_route']):
+            raise DispatchError('mixed snapshot device route disagrees with audit')
+    for table in ('tasks', 'schedules', 'schedule_firings'):
+        for entity in records[table]:
+            key = (table, entity[ROUTED_TABLES[table]])
+            if key in identities and identities[key] != entity['execution_route']:
+                raise DispatchError('mixed snapshot route disagrees with audit')
 
 
 def import_snapshot_records(conn, records):
@@ -277,7 +368,9 @@ def import_snapshot_records(conn, records):
     records = _normalize_snapshot(records)
     _settled(records)
     present = _present(conn)
-    content_tables = set(SNAPSHOT_TABLES) - {"schema_migrations"}
+    content_tables = set(SNAPSHOT_TABLES) - {"schema_migrations", 'ledger_mode'}
+    if ledger_mode(conn) != 'isolated':
+        raise DispatchError('import requires an isolated target ledger')
     if _unknown_populated(conn) or any(conn.execute("SELECT 1 FROM " + name + " LIMIT 1").fetchone()
                                      for name in present & content_tables):
         raise DispatchError("import requires empty store, including extension tables")
@@ -301,6 +394,8 @@ def import_snapshot_records(conn, records):
     conn.execute("PRAGMA defer_foreign_keys=ON")
     disabled = []
     for table in SNAPSHOT_TABLES:
+        if table == 'ledger_mode':
+            continue
         info = list(conn.execute("PRAGMA table_info(" + table + ")"))
         columns = {row["name"] for row in info}
         required = {row["name"] for row in info if (row["notnull"] and row["dflt_value"] is None) or row["pk"]}
@@ -325,6 +420,8 @@ def import_snapshot_records(conn, records):
                 raise DispatchError("invalid snapshot rows for " + table) from exc
     if conn.execute("PRAGMA foreign_key_check").fetchone():
         raise DispatchError("invalid snapshot references")
+    if records['ledger_mode'][0]['mode'] == 'mixed':
+        conn.execute("UPDATE ledger_mode SET mode='mixed' WHERE id=1")
     return {"disabled_schedule_ids": sorted(disabled), "schedules_enabled": 0,
             "target_migration_metadata_retained": migration_preserved,
             "rows": {name: len(rows) for name, rows in records.items()}}
@@ -334,13 +431,18 @@ def export_bundle(config, destination):
     path = Path(destination).resolve()
     if path.exists():
         raise ArtifactError("E_BUNDLE_EXISTS", "choose a new bundle directory")
-    records = ledger(config.db_path)
+    records = ledger(config.db_path, include_devices=True)
     # Direct API callers may export an unopened pre-0010 ledger. Normalize only
     # the portable records; never mutate the source database during export.
     for schedule in records.get('schedules', []):
         schedule.setdefault('max_slots', None)
     source = ArtifactStore(config.artifact_root)
-    hashes = _artifact_inventory(records, source)
+    try:
+        _normalize_routes(records, current=True)
+        del records['devices']
+        hashes = _artifact_inventory(records, source)
+    except DispatchError as exc:
+        raise ArtifactError('E_EXPORT_BLOCKED', str(exc)) from exc
     for attempt in records.get('claude_attempts',[]):
         attempt['run_dir']=''
         attempt['execution_authority']='historical_only'
@@ -371,9 +473,10 @@ def read_bundle(path):
         if not manifest_path.resolve().is_relative_to(path):
             raise ValueError("manifest location escapes the bundle")
         manifest = json.loads(manifest_path.read_bytes())
-        if manifest["schema"] not in (V1_FORMAT, V2_FORMAT,V3_FORMAT,V4_FORMAT,V5_FORMAT, FORMAT):
+        if manifest["schema"] not in (V1_FORMAT, V2_FORMAT,V3_FORMAT,V4_FORMAT,V5_FORMAT,V6_FORMAT, FORMAT):
             raise ValueError("unsupported bundle format")
-        layout = {V1_FORMAT:V1_TABLES,V2_FORMAT:V2_TABLES,V3_FORMAT:V3_TABLES,V4_FORMAT:V4_TABLES,V5_FORMAT:V5_TABLES,FORMAT:TABLES}[manifest['schema']]
+        layout = {V1_FORMAT:V1_TABLES,V2_FORMAT:V2_TABLES,V3_FORMAT:V3_TABLES,V4_FORMAT:V4_TABLES,
+                  V5_FORMAT:V5_TABLES,V6_FORMAT:V6_TABLES,FORMAT:TABLES}[manifest['schema']]
         expected = {name + ".jsonl" for name in layout}
         if set(manifest["files"]) != expected or {p.name for p in path.glob("*.jsonl")} != expected:
             raise ValueError("unsupported bundle layout")
@@ -390,13 +493,14 @@ def read_bundle(path):
             if any(not isinstance(row, dict) for row in records[table]):
                 raise ValueError("record must be an object")
         for schedule in records.get('schedules',[]):
-            if ('max_slots' in schedule)!=(manifest['schema'] in (V5_FORMAT,FORMAT)):
+            if ('max_slots' in schedule)!=(manifest['schema'] in (V5_FORMAT,V6_FORMAT,FORMAT)):
                 raise ValueError('schedule columns do not match the declared bundle version')
-        if manifest["schema"] in (V2_FORMAT,V3_FORMAT,V4_FORMAT,V5_FORMAT,FORMAT):
+        if manifest["schema"] != V1_FORMAT:
             if manifest.get("import_policy") != {"schedules": "disabled", "devices": "excluded"}:
                 raise ValueError("unsupported import policy")
             if manifest.get("source_counts") != {name: len(records[name]) for name in layout}:
                 raise ValueError("record counts disagree")
+        _normalize_routes(records, current=manifest['schema'] == FORMAT)
         store = ArtifactStore(path / "artifacts")
         if not store.root.is_relative_to(path):
             raise ValueError("artifact root escapes the bundle")

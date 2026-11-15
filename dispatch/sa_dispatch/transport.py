@@ -37,6 +37,14 @@ class CoordinatorAPI:
         for device, digest in self.token_hashes.items():
             if not isinstance(device, str) or not device or not isinstance(digest,str) or not re.fullmatch('[0-9a-f]{64}',digest):
                 raise ValueError('device -> SHA256 hex configuration required')
+        self._transport_route()
+
+    def _transport_route(self):
+        if self.store.routing_mode() == 'mixed':
+            if self.store.route != 'http_synthetic' or not self.synthetic_handoff:
+                raise TransportError('E_ROUTE', 403)
+        elif self.store.route is not None:
+            raise TransportError('E_ROUTE', 403)
 
     def identity(self, authorization):
         if not isinstance(authorization,str) or not authorization.startswith('Bearer '):
@@ -53,6 +61,7 @@ class CoordinatorAPI:
 
     def invoke(self, path, payload, authorization):
         device=self.identity(authorization)
+        self._transport_route()
         if not isinstance(payload,dict): raise TransportError('E_VALIDATION',400)
         fields={'/health':set(),'/claim':set(),'/renew':{'lease_id','fence'},
                 '/complete':{'lease_id','fence','outcome'},'/status':{'task_id'}}
@@ -72,8 +81,10 @@ class CoordinatorAPI:
             if self.synthetic_handoff:
                 # A crash after submit but before grant commit leaves a safe
                 # blocked task. Replaying submit restores the handoff marker.
-                with self.store._tx() as conn:
-                    missing=conn.execute("SELECT 1 FROM tasks t LEFT JOIN transport_handoffs h ON h.task_id=t.task_id WHERE t.status='queued' AND h.task_id IS NULL LIMIT 1").fetchone()
+                with self.store._tx(execution=True) as conn:
+                    route_sql = '' if self.store.route is None else ' AND t.execution_route=?'
+                    route_args = () if self.store.route is None else (self.store.route,)
+                    missing=conn.execute("SELECT 1 FROM tasks t LEFT JOIN transport_handoffs h ON h.task_id=t.task_id WHERE t.status='queued' AND h.task_id IS NULL" + route_sql + ' LIMIT 1', route_args).fetchone()
                     if missing: raise TransportError('E_HANDOFF_NOT_READY',409)
             lease=self.store.claim(device, synthetic_handoff=self.synthetic_handoff)
             return {'lease':asdict(lease) if lease else None}
@@ -83,6 +94,7 @@ class CoordinatorAPI:
             if not any(l.device_id==device for l in self.store.list_leases(task_id)):
                 raise TransportError('E_NOT_FOUND',404)
             task=self.store.get_task(task_id)
+            self.store.require_task_route(task)
             # No raw params, refs, results or private scope leave this metadata API.
             return {k:task[k] for k in ('task_id','status','fence','attempts','updated_at')}
         if not isinstance(payload['lease_id'],str) or type(payload['fence']) is not int or payload['fence']<1:
@@ -91,6 +103,7 @@ class CoordinatorAPI:
         lease=self.store.get_lease(payload['lease_id'])
         if lease is None or lease.device_id!=device:
             raise TransportError('E_NOT_FOUND',404)
+        self.store.require_task_route(self.store.get_task(lease.task_id))
         if path in ('/task','/artifact/get','/artifact/put'):
             return self._handoff(path,payload,device)
         if path=='/renew':
@@ -102,7 +115,7 @@ class CoordinatorAPI:
         if self.synthetic_handoff:
             if any(ev.access!='synthetic' for ev in outcome.evidence): raise TransportError('E_SCOPE',403)
             with self.grant_lock:
-                with self.store._tx() as conn:
+                with self.store._tx(execution=True) as conn:
                     grants=self._grants(conn,lease.task_id,lease.lease_id)
                 for ev in outcome.evidence:
                     if ev.artifact_hash is None or ev.artifact_hash not in grants or ev.content_hash!=ev.artifact_hash:
@@ -145,8 +158,9 @@ class CoordinatorAPI:
             for digest,content in decoded.items():
                 self.artifact_store.put(content)
             task,dedup=self.store.submit(spec)
-            with self.store._tx() as conn:
+            with self.store._tx(execution=True) as conn:
                 current=self.store._task(conn.execute('SELECT * FROM tasks WHERE task_id=?',(task.task_id,)).fetchone())
+                self.store.require_task_route(current, conn=conn)
                 if current.access!='synthetic': raise TransportError('E_SCOPE',403)
                 for digest in decoded:self._grant(conn,task.task_id,None,digest)
                 conn.execute('INSERT OR IGNORE INTO transport_handoffs VALUES(?,?,?)',(task.task_id,actor,self.store._now()))
@@ -163,7 +177,7 @@ class CoordinatorAPI:
     def _handoff(self,path,payload,device):
         # Keep lease fence stable through artifact access. The dedicated local
         # artifact store uses bounded content; no untrusted filesystem paths.
-        with self.grant_lock, self.store._tx() as conn:
+        with self.grant_lock, self.store._tx(execution=True) as conn:
             lease,task,valid=self.store._active(conn,payload['lease_id'],payload['fence'],device)
             if not valid: raise FenceRejected('handoff requires active owned unexpired lease')
             if task['access']!='synthetic': raise TransportError('E_SCOPE',403)

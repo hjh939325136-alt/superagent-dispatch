@@ -83,6 +83,18 @@ cwd = {literal(self.root)}
                 self.write_config(platform="win32")
         self.assertEqual(error.exception.code, "E_PLATFORM")
 
+    def test_execution_route_requires_explicit_synthetic_configuration(self):
+        self.assertIsNone(self.write_config().execution_route)
+        for route in ('local_synthetic', 'http_synthetic'):
+            with self.subTest(route=route):
+                config = self.write_config(root_extra=f'synthetic = true\nexecution_route = "{route}"')
+                self.assertEqual(config.execution_route, route)
+                with self.assertRaises(ConfigError):
+                    self.write_config(root_extra=f'execution_route = "{route}"')
+        for raw in ('"unknown"', 'false', '[]', '42'):
+            with self.subTest(raw=raw), self.assertRaises(ConfigError):
+                self.write_config(root_extra=f'synthetic = true\nexecution_route = {raw}')
+
     def test_shell_and_batch_entrypoints_are_rejected(self):
         for filename in ("operator.cmd", "operator.BAT", "cmd.exe", "pwsh.exe"):
             with self.subTest(filename=filename), self.assertRaises(ConfigError):

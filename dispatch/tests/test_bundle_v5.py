@@ -42,7 +42,7 @@ class BundleV5Tests(unittest.TestCase):
         self.assertEqual(rows['schedules'][0]['max_slots'],None)
         self.assertEqual(rows['schedules'][0]['enabled'],0)
         self.assertEqual(len(rows['schedule_firings']),1)
-        self.assertEqual({r['version'] for r in rows['schema_migrations']},{'0007','0008','0009','0010','0011'})
+        self.assertEqual({r['version'] for r in rows['schema_migrations']},{'0007','0008','0009','0010','0011','0012'})
 
     def test_actual_0009_database_additive_migration(self):
         self.verify_frozen();root=Path(self.temp.name)/'old-runtime';root.mkdir()
@@ -70,16 +70,18 @@ print(json.dumps(ledger(c.db_path)))
         before=json.loads(result.stdout)
         direct=Path(self.temp.name)/'direct-old-export'
         export_bundle(config,direct)
-        self.assertEqual(read_bundle(direct)[0]['schema'],'sa_dispatch.bundle.v6')
+        self.assertEqual(read_bundle(direct)[0]['schema'],'sa_dispatch.bundle.v7')
         self.assertNotIn('max_slots',ledger(config.db_path)['schedules'][0])
         SqliteStore(config.db_path,lease_ttl_seconds=10)
         after=ledger(config.db_path)
         for table,rows in before.items():
             if table=='schema_migrations':
                 self.assertEqual(after[table][:len(rows)],rows)
-                self.assertEqual([r['version'] for r in after[table][len(rows):]],['0010','0011'])
+                self.assertEqual([r['version'] for r in after[table][len(rows):]],['0010','0011','0012'])
             elif table=='schedules':
-                self.assertEqual(after[table],[dict(row,max_slots=None) for row in rows])
+                self.assertEqual(after[table],[dict(row,max_slots=None,execution_route=None) for row in rows])
+            elif table in ('tasks','schedule_firings'):
+                self.assertEqual(after[table],[dict(row,execution_route=None) for row in rows])
             else:self.assertEqual(after[table],rows,table)
 
     def test_v5_roundtrip_retains_exhaustion_and_history(self):
@@ -88,7 +90,7 @@ print(json.dumps(ledger(c.db_path)))
         for task in self.store.list_tasks():self.store.cancel(task.task_id,'fixture')
         config=SimpleNamespace(db_path=self.path,artifact_root=Path(self.temp.name)/'cas')
         package=Path(self.temp.name)/'v5';export_bundle(config,package)
-        self.assertEqual(read_bundle(package)[0]['schema'],'sa_dispatch.bundle.v6')
+        self.assertEqual(read_bundle(package)[0]['schema'],'sa_dispatch.bundle.v7')
         target=self.config('target');store=SqliteStore(target.db_path,lease_ttl_seconds=10)
         import_bundle(target,package,store)
         before=ledger(config.db_path);after=ledger(target.db_path)

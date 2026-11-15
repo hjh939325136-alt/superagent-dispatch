@@ -56,7 +56,8 @@ class BundleV3Tests(unittest.TestCase):
         package=self.root/'actual-v2'; package.mkdir()
         files={}
         for table,records in rows.items():
-            data=b''.join(receipt_bytes(record)+b'\n' for record in records)
+            data=b''.join(receipt_bytes({key:value for key,value in record.items() if key!='execution_route'})
+                          + b'\n' for record in records)
             (package/(table+'.jsonl')).write_bytes(data); files[table+'.jsonl']=sha256_ref(data)
         ArtifactStore(package/'artifacts').put(self.artifacts.get(ref))
         manifest={'schema':V2_FORMAT,'files':files,'artifacts':[ref],
@@ -69,9 +70,10 @@ class BundleV3Tests(unittest.TestCase):
         report=import_bundle(config,package,target)
         restored=ledger(config.db_path)
         self.assertEqual(target.get_task(task.task_id).status,'succeeded')
-        self.assertEqual({row['version'] for row in restored['schema_migrations']},{'0007','0008','0009','0010','0011'})
+        self.assertEqual({row['version'] for row in restored['schema_migrations']},{'0007','0008','0009','0010','0011','0012'})
         self.assertTrue(report['target_migration_metadata_retained'])
-        for table in set(TABLES)-set(V2_TABLES): self.assertEqual(restored[table],[],table)
+        self.assertEqual(restored['ledger_mode'], [{'id': 1, 'mode': 'isolated'}])
+        for table in set(TABLES)-set(V2_TABLES)-{'ledger_mode'}: self.assertEqual(restored[table],[],table)
         self.assertEqual(ArtifactStore(config.artifact_root).get(ref),self.artifacts.get(ref))
 
     def settled_host_control(self):

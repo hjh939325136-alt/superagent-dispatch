@@ -45,7 +45,7 @@ class MigrationTests(unittest.TestCase):
             with ThreadPoolExecutor(2) as pool:
                 stores = list(pool.map(lambda _: SqliteStore(path, lease_ttl_seconds=10), range(2)))
             versions = [row['version'] for row in stores[0].snapshot()['schema_migrations']]
-            self.assertEqual(sorted(versions), ['0007', '0008', '0009', '0010', '0011'])
+            self.assertEqual(sorted(versions), ['0007', '0008', '0009', '0010', '0011', '0012'])
             self.assertEqual(stores[1].events(task.task_id), events)
 
 

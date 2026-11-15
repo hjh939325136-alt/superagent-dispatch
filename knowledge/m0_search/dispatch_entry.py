@@ -69,6 +69,8 @@ KINDS = {ResearchKind.name: ResearchKind()}
 
 
 def configured_kinds(config):
+    if config.execution_route not in (None, 'local_synthetic'):
+        raise ValueError('research requires the local execution route')
     component = config.components.get('research')
     if not component or '--source-binding' not in component.argv:
         return KINDS

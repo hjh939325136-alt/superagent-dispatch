@@ -60,10 +60,13 @@ def load_identities(path):
 def serve(config, kinds, identities, port, *, schedules=False):
     if not config.synthetic or config.components or not kinds:
         raise ValueError("serve requires a dedicated synthetic configuration, a task plugin, and no local components")
+    if config.execution_route not in (None, 'http_synthetic'):
+        raise ValueError('HTTP service requires the HTTP execution route')
     if not 0 <= port <= 65535:
         raise ValueError("port must be between 0 and 65535")
     hashes, roles, workers = load_identities(identities)
-    store = SqliteStore(config.db_path, lease_ttl_seconds=config.lease_ttl_seconds, kinds=kinds)
+    store = SqliteStore(config.db_path, lease_ttl_seconds=config.lease_ttl_seconds, kinds=kinds,
+                        route=config.execution_route)
     api = CoordinatorAPI(store, hashes, roles=roles, synthetic_handoff=True,
                          artifact_store=ArtifactStore(config.artifact_root))
     with create_server(api, port=port) as server:

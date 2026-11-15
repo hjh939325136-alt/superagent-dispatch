@@ -14,6 +14,7 @@ from .models import (DispatchError, DuplicateInflight, Evidence, FenceRejected,
                      IdempotencyConflict, InvalidTransition, Lease, Outcome,
                      Ref, SweepReport, TaskRow, TaskSpec)
 from .states import TERMINAL, validate_transition
+from .routing import HTTP_ROUTE, ROUTES, RouteRejected, audit, ledger_mode
 
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
@@ -21,33 +22,73 @@ def _json(value):
 class SqliteStore:
     TABLES = ('tasks', 'leases', 'events', 'evidence', 'late_results', 'devices')
 
-    def __init__(self, path, *, clock=None, lease_ttl_seconds, kinds=None, component_config=None):
+    def __init__(self, path, *, clock=None, lease_ttl_seconds, kinds=None, component_config=None, route=None):
         if type(lease_ttl_seconds) is not int or lease_ttl_seconds <= 0:
             raise DispatchError('positive explicit lease TTL required')
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if route is not None and route not in ROUTES:
+            raise RouteRejected('invalid execution route')
+        self._route = route
         self.clock = clock or Clock()
         self.lease_ttl_seconds = lease_ttl_seconds
         self.kinds = kinds
         self.component_config = component_config
-        with closing(self._connect()) as conn:
-            conn.executescript(Path(__file__).with_name('schema.sql').read_text(encoding='utf-8'))
+        if self.path.exists():
+            mode = self.routing_mode()
+            if mode == 'mixed':
+                return
+        if route is not None:
+            raise RouteRejected('execution routes require a mixed ledger')
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with closing(self._write_connect(create=True)) as conn, conn:
             conn.execute('BEGIN IMMEDIATE')
+            if ledger_mode(conn) == 'mixed':
+                return
+            for statement in Path(__file__).with_name('schema.sql').read_text(encoding='utf-8').split(';'):
+                if statement.strip():
+                    conn.execute(statement)
             from .migrations import apply_m0_schema
             apply_m0_schema(conn, self._now())
-            conn.commit()
 
     def _connect(self):
-        conn = sqlite3.connect(self.path, timeout=10)
+        return self._open('ro')
+
+    def _write_connect(self, *, create=False):
+        return self._open('rwc' if create else 'rw')
+
+    def _open(self, mode):
+        conn = sqlite3.connect(self.path.resolve().as_uri() + '?mode=' + mode, uri=True, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA foreign_keys=ON')
         return conn
 
+    @property
+    def route(self):
+        return self._route
+
+    def routing_mode(self):
+        with closing(self._connect()) as conn:
+            return ledger_mode(conn)
+
+    def require_task_route(self, task, *, conn=None):
+        mode = ledger_mode(conn) if conn is not None else self.routing_mode()
+        if mode == 'mixed' and (self.route is None or task is None or task['execution_route'] != self.route):
+            raise RouteRejected('task does not belong to this execution route')
+        if mode == 'isolated' and self.route is not None:
+            raise RouteRejected('execution routes require a mixed ledger')
+
     @contextmanager
-    def _tx(self):
-        conn = self._connect()
+    def _tx(self, *, execution=False):
+        if (self.route is None or not execution) and self.routing_mode() == 'mixed':
+            raise RouteRejected('mixed ledger requires a route-aware write entry point')
+        conn = self._write_connect()
         try:
             conn.execute('BEGIN IMMEDIATE')
+            mode = ledger_mode(conn)
+            if mode == 'mixed' and (self.route is None or not execution):
+                raise RouteRejected('mixed ledger requires a route-aware write entry point')
+            if mode == 'isolated' and self.route is not None:
+                raise RouteRejected('execution routes require a mixed ledger')
             yield conn
             conn.commit()
         except Exception:
@@ -57,6 +98,14 @@ class SqliteStore:
             conn.close()
 
     def _now(self): return timestamp(self.clock.now())
+
+    def _enabled_kind(self, name, version):
+        kind = self.kinds.get(name) if self.kinds is not None else None
+        return (kind is not None and kind.version == version and kind.enabled
+                and not getattr(kind, 'dedicated_runner', False))
+
+    def _requires_control(self, name):
+        return bool(self.kinds and getattr(self.kinds.get(name), 'requires_control_rule', False))
 
     def _task(self, row):
         if row is None: raise DispatchError('task not found')
@@ -93,7 +142,9 @@ class SqliteStore:
         c.execute('UPDATE tasks SET status=?,updated_at=? WHERE task_id=?', (new, self._now(), task['task_id']))
         self._event(c, task, task['status'], new, reason, actor)
 
-    def submit(self, spec, *, side_effect=None, scope=None):
+    def submit(self, spec, *, side_effect=None, scope=None, control_rule=None):
+        if isinstance(spec, dict) and 'execution_route' in spec:
+            raise RouteRejected('task payload cannot set the execution route')
         if isinstance(spec, dict): spec = TaskSpec.from_dict(spec)
         if not spec.idem_key or not spec.kind or type(spec.kind_version) is not int or spec.kind_version < 1:
             raise DispatchError('invalid task identity')
@@ -103,6 +154,9 @@ class SqliteStore:
             raise DispatchError('invalid access/egress')
         if not isinstance(spec.params, dict) or any(not isinstance(v,str) or not v for v in spec.required_caps):
             raise DispatchError('invalid params/capabilities')
+        if self.route is not None and (spec.access != 'synthetic' or spec.egress != 'none'
+                                      or not self._enabled_kind(spec.kind, spec.kind_version)):
+            raise RouteRejected('execution route requires a registered synthetic kind without egress')
         if self.kinds is not None:
             kind = self.kinds.get(spec.kind)
             if kind is None or kind.version != spec.kind_version:
@@ -126,49 +180,112 @@ class SqliteStore:
             fingerprint = sha256_ref(canonical_json(identity))
         except (TypeError, ValueError) as exc:
             raise DispatchError('unsupported task identity value') from exc
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             existing = c.execute('SELECT * FROM tasks WHERE idem_key=?', (spec.idem_key,)).fetchone()
             if existing:
+                if existing['execution_route'] != self.route:
+                    raise IdempotencyConflict('key already belongs to a different execution route')
                 if existing['fingerprint'] != fingerprint: raise IdempotencyConflict('key already has different semantics')
+                if control_rule is not None:
+                    self._bind_submission_rule(c, existing, control_rule, existing=True)
                 return self._task(existing), True
             if side_effect != 'none' and c.execute("SELECT 1 FROM tasks WHERE fingerprint=? AND status NOT IN('succeeded','no_new','failed','cancelled')", (fingerprint,)).fetchone():
                 raise DuplicateInflight('identical write is already in flight')
+            if self.route is not None and self._requires_control(spec.kind) and control_rule is None:
+                raise RouteRejected('kind requires an atomic submission control rule')
             task_id, now = 't_' + uuid4().hex, self._now()
+            if self.route is not None and spec.parent_task_id:
+                parent = c.execute('SELECT * FROM tasks WHERE task_id=?', (spec.parent_task_id,)).fetchone()
+                self.require_task_route(parent, conn=c)
             row = dict(task_id=task_id, idem_key=spec.idem_key, fingerprint=fingerprint,
                        kind=spec.kind, kind_version=spec.kind_version, track=spec.track,
                        params_json=_json(spec.params), input_refs_json=_json(identity['input_refs']),
                        required_caps_json=_json(identity['required_caps']),scope_json=_json(scope),
                        side_effect=side_effect,access=spec.access,egress=spec.egress,status='queued',
                        fence=0,attempts=0,max_attempts=spec.max_attempts,parent_task_id=spec.parent_task_id,
-                       result_json=None,created_at=now,updated_at=now)
+                       result_json=None,created_at=now,updated_at=now,execution_route=self.route)
             c.execute(f"INSERT INTO tasks({','.join(row)}) VALUES({','.join('?' for _ in row)})", tuple(row.values()))
+            if control_rule is not None:
+                self._bind_submission_rule(c, row, control_rule)
             self._event(c,row,None,'queued','submitted','submit')
             return self._task(row), False
+
+    def _bind_submission_rule(self, conn, task, rule, *, existing=False):
+        from .control_policy import _id, _units
+        if self.route is None or not isinstance(rule, dict) or not rule or not set(rule) <= {
+                'budget_id', 'reserve_units', 'approval_scope'}:
+            raise RouteRejected('invalid atomic submission rule')
+        budget, approval = rule.get('budget_id'), rule.get('approval_scope')
+        units = _units(rule.get('reserve_units', 0))
+        if (not budget and (units or not approval)) or (budget is not None and _id(budget) != budget):
+            raise RouteRejected('atomic rule requires a budget or approval scope')
+        if approval is not None:
+            _id(approval)
+        values = (task['task_id'], task['fingerprint'], budget, units, approval)
+        if existing:
+            bound = conn.execute('SELECT task_id,fingerprint,budget_id,reserve_units,approval_scope '
+                                 'FROM control_task_rules WHERE task_id=?', (task['task_id'],)).fetchone()
+            if bound is None or tuple(bound) != values:
+                raise IdempotencyConflict('submission control rule differs from the bound rule')
+        else:
+            if budget is not None and not conn.execute('SELECT 1 FROM control_budgets WHERE budget_id=?', (budget,)).fetchone():
+                raise RouteRejected('submission budget is not configured')
+            conn.execute('INSERT INTO control_task_rules VALUES(?,?,?,?,?,NULL)', values)
 
     def register_device(self, device_id, caps):
         if not isinstance(device_id,str) or not device_id or any(not isinstance(v,str) or not v for v in caps):
             raise DispatchError('invalid device')
-        with self._tx() as c:
-            c.execute('INSERT INTO devices(device_id,caps_json,last_seen_at) VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET caps_json=excluded.caps_json,last_seen_at=excluded.last_seen_at',
-                      (device_id,_json(sorted(set(caps))),self._now()))
+        with self._tx(execution=True) as c:
+            if self.route is not None:
+                old = c.execute('SELECT execution_route FROM devices WHERE device_id=?', (device_id,)).fetchone()
+                if old is not None and old['execution_route'] != self.route:
+                    raise RouteRejected('device identifier was not approved for this route')
+                if old is None:
+                    self._register_route_identity(c, device_id)
+            c.execute('INSERT INTO devices(device_id,caps_json,last_seen_at,execution_route) VALUES(?,?,?,?) '
+                      'ON CONFLICT(device_id) DO UPDATE SET caps_json=excluded.caps_json,last_seen_at=excluded.last_seen_at',
+                      (device_id,_json(sorted(set(caps))),self._now(),self.route))
+        if self.route is not None:
+            return SweepReport()
         return self.sweep()
+
+    def _register_route_identity(self, conn, device_id):
+        known = {row[0] for row in conn.execute(
+            "SELECT execution_route FROM route_audit WHERE object_table='devices' AND object_id=? "
+            "UNION SELECT t.execution_route FROM leases l JOIN tasks t ON t.task_id=l.task_id "
+            "WHERE l.device_id=? AND t.execution_route IS NOT NULL", (device_id, device_id))}
+        if known and known != {self.route}:
+            raise RouteRejected('device identifier belongs to another route')
+        if not conn.execute("SELECT 1 FROM route_audit WHERE object_table='devices' AND object_id=?",
+                            (device_id,)).fetchone():
+            audit(conn, 'register', 'devices', device_id, self.route, device_id, self._now(), None)
 
     device_register = register_device
 
     def claim(self, device_id, caps=None, *, synthetic_handoff=False, kinds=None):
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             dev = c.execute('SELECT * FROM devices WHERE device_id=?',(device_id,)).fetchone()
             if not dev: raise DispatchError('device must be registered')
+            if self.route is not None and dev['execution_route'] != self.route:
+                raise RouteRejected('device does not belong to this execution route')
             allowed = set(json.loads(dev['caps_json']))
             if caps is not None: allowed &= set(caps)
             sql = "SELECT * FROM tasks WHERE status='queued'"
-            if synthetic_handoff:
+            params = ()
+            if self.route is not None:
+                sql += " AND execution_route=? AND access='synthetic' AND egress='none'"
+                params = (self.route,)
+            if synthetic_handoff or self.route == HTTP_ROUTE:
                 sql += " AND access='synthetic' AND EXISTS (SELECT 1 FROM transport_handoffs h WHERE h.task_id=tasks.task_id)"
-            for row in c.execute(sql + " ORDER BY created_at,task_id").fetchall():
+            for row in c.execute(sql + " ORDER BY created_at,task_id", params).fetchall():
                 if kinds is not None and row['kind'] not in kinds: continue
+                if self.route is not None and not self._enabled_kind(row['kind'], row['kind_version']): continue
                 if not set(json.loads(row['required_caps_json'])) <= allowed: continue
                 if row['attempts'] >= row['max_attempts']: continue
                 from .control_policy import before_claim
+                if self.route is not None and self._requires_control(row['kind']) and not c.execute(
+                        'SELECT 1 FROM control_task_rules WHERE task_id=?', (row['task_id'],)).fetchone():
+                    continue
                 if not before_claim(c, row, row['fence']+1, device_id, self._now()): continue
                 lease = Lease('l_'+uuid4().hex,row['task_id'],row['fence']+1,device_id,
                               timestamp(self.clock.now()+timedelta(seconds=self.lease_ttl_seconds)))
@@ -183,12 +300,20 @@ class SqliteStore:
     def _active(self,c,lease_id,fence,device_id):
         lease = c.execute('SELECT * FROM leases WHERE lease_id=?',(lease_id,)).fetchone()
         task = c.execute('SELECT * FROM tasks WHERE task_id=?',(lease['task_id'],)).fetchone() if lease else None
+        if self.route is not None:
+            if task is not None:
+                self.require_task_route(task, conn=c)
+                if not self._enabled_kind(task['kind'], task['kind_version']):
+                    raise RouteRejected('lease kind and version are not enabled on this route')
+            device = c.execute('SELECT execution_route FROM devices WHERE device_id=?', (device_id,)).fetchone()
+            if device is None or device['execution_route'] != self.route:
+                raise RouteRejected('lease device does not belong to this execution route')
         valid = bool(lease and task and lease['fence']==fence and lease['device_id']==device_id and
                      lease['state']=='active' and lease['expires_at']>self._now() and task['fence']==fence and task['status']=='leased')
         return lease, task, valid
 
     def renew(self,lease_id,fence,device_id):
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             lease,task,valid = self._active(c,lease_id,fence,device_id)
             if not valid: raise FenceRejected('lease is not current, owned and unexpired')
             expires=timestamp(self.clock.now()+timedelta(seconds=self.lease_ttl_seconds))
@@ -203,6 +328,8 @@ class SqliteStore:
     def _record_evidence(self,c,task,outcome):
         for ev in outcome.evidence:
             if ev.access not in ('synthetic','exportable','local_only'): raise DispatchError('invalid evidence access')
+            if self.route is not None and ev.access != 'synthetic':
+                raise RouteRejected('mixed completion requires synthetic evidence')
             c.execute('INSERT OR IGNORE INTO evidence VALUES(?,?,?,?,?,?,?,?,?)',
                       ('e_'+uuid4().hex,task['task_id'],task['fence'],ev.kind,_json(asdict(ev.ref)) if ev.ref else None,
                        ev.content_hash,ev.artifact_hash,ev.access,self._now()))
@@ -210,8 +337,10 @@ class SqliteStore:
     def complete(self,lease_id,fence,outcome,device_id):
         outcome, encoded = self._outcome(outcome)
         rejected=False
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             lease,task,valid=self._active(c,lease_id,fence,device_id)
+            if self.route is not None and any(item.access != 'synthetic' for item in outcome.evidence):
+                raise RouteRejected('mixed completion requires synthetic evidence')
             if lease and lease['state']=='completed' and lease['fence']==fence and lease['device_id']==device_id and lease['completion_json']==encoded:
                 return
             if not valid:
@@ -231,7 +360,7 @@ class SqliteStore:
         if rejected: raise FenceRejected('completion is late or not owned')
 
     def mark_unknown(self,lease_id,fence,reason,device_id):
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             lease,task,valid=self._active(c,lease_id,fence,device_id)
             if not valid: raise FenceRejected('lease is not current, owned and unexpired')
             self._transition(c,task,'unknown',reason,device_id)
@@ -241,8 +370,17 @@ class SqliteStore:
 
     def sweep(self, *, worker_ids=None):
         counts=asdict(SweepReport())
-        with self._tx() as c:
-            rows=c.execute("SELECT t.*,l.lease_id FROM tasks t JOIN leases l ON t.task_id=l.task_id WHERE t.status='leased' AND l.state='active' AND l.expires_at<=?",(self._now(),)).fetchall()
+        with self._tx(execution=True) as c:
+            expiry = "SELECT t.*,l.lease_id FROM tasks t JOIN leases l ON t.task_id=l.task_id WHERE t.status='leased' AND l.state='active' AND l.expires_at<=?"
+            devices_sql = 'SELECT device_id,caps_json FROM devices'
+            queued = "SELECT * FROM tasks WHERE status IN('queued','waiting_device')"
+            params = ()
+            if self.route is not None:
+                expiry += ' AND t.execution_route=? AND t.fence=l.fence'
+                devices_sql += ' WHERE execution_route=?'
+                queued += ' AND execution_route=?'
+                params = (self.route,)
+            rows=c.execute(expiry, (self._now(), *params)).fetchall()
             for task in rows:
                 status='unknown' if task['side_effect']!='none' else ('queued' if task['attempts']<task['max_attempts'] else 'failed')
                 self._transition(c,task,status,'lease expired','sweep')
@@ -251,9 +389,10 @@ class SqliteStore:
                 expire_reservation(c,task['task_id'],task['fence'],'sweep',self._now())
                 counts['expired']+=1
                 counts['requeued' if status=='queued' else status]+=1
-            devices=[set(json.loads(r['caps_json'])) for r in c.execute('SELECT device_id,caps_json FROM devices')
+            devices=[set(json.loads(r['caps_json'])) for r in c.execute(devices_sql, params)
                      if worker_ids is None or r['device_id'] in worker_ids]
-            for task in c.execute("SELECT * FROM tasks WHERE status IN('queued','waiting_device')").fetchall():
+            for task in c.execute(queued, params).fetchall():
+                if self.route is not None and not self._enabled_kind(task['kind'], task['kind_version']): continue
                 capable=any(set(json.loads(task['required_caps_json']))<=caps for caps in devices)
                 status='queued' if capable else 'waiting_device'
                 if status!=task['status']:
@@ -263,6 +402,8 @@ class SqliteStore:
     def register_capability(self, component, capability, *, lookup_by_write_key=False,
                             idempotency_proof='none', proof_ref=None, artifacts=None):
         """Register operator-reviewed capability evidence; no component is invoked here."""
+        if self.routing_mode() == 'mixed':
+            raise RouteRejected('component capability writes require a mixed route-aware entry point')
         if not component or not capability or type(lookup_by_write_key) is not bool:
             raise DispatchError('component, versioned capability and lookup flag required')
         if idempotency_proof not in ('none', 'claimed', 'verified'):
@@ -312,9 +453,12 @@ class SqliteStore:
                         component=None,capability=None,evidence_ref=None,expected_fence=None,
                         artifacts=None):
         if not actor: raise DispatchError('actor required')
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             task=c.execute('SELECT * FROM tasks WHERE task_id=?',(task_id,)).fetchone()
+            self.require_task_route(task, conn=c)
             if not task or task['status']!='unknown': raise InvalidTransition('task is not unknown')
+            if self.route is not None and verdict != 'still_unknown':
+                raise RouteRejected('mixed reconciliation requires route-aware domain evidence')
             if verdict != 'still_unknown' and (type(expected_fence) is not int or artifacts is None):
                 raise DispatchError('state-changing reconciliation requires attempt fence and artifacts')
             if expected_fence is not None and task['fence'] != expected_fence:
@@ -400,8 +544,9 @@ class SqliteStore:
                        evidence_ref, actor, self._now()))
 
     def cancel(self,task_id,actor):
-        with self._tx() as c:
+        with self._tx(execution=True) as c:
             task=c.execute('SELECT * FROM tasks WHERE task_id=?',(task_id,)).fetchone()
+            self.require_task_route(task, conn=c)
             if not task or task['status'] not in ('queued','waiting_device'): raise InvalidTransition('cannot cancel task')
             self._transition(c,task,'cancelled','cancelled',actor)
 
@@ -415,7 +560,8 @@ class SqliteStore:
 
     def snapshot(self):
         from .bundle import snapshot_records
-        with self._tx() as c:
+        with closing(self._connect()) as c:
+            c.execute('BEGIN')
             return snapshot_records(c)
 
     def import_snapshot(self,snapshot):

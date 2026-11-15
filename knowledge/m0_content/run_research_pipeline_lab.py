@@ -108,7 +108,7 @@ def manager_binding(work,binding):
     def source(id,kind,path,version,instance,options):
         return {'source_id':id,'kind':kind,'locator':str(path),'accepted_schema_versions':[version],
                 'source_instance':instance,'class':'internal','freshness_s':86400,'options':options}
-    sources=[source('workflow-dispatch','dispatch',work/'ledger.sqlite3','0011','workflow-dispatch',
+    sources=[source('workflow-dispatch','dispatch',work/'ledger.sqlite3','0012','workflow-dispatch',
                     {'identity':{'device':info.st_dev,'inode':info.st_ino}}),
              source('workflow-knowledge','knowledge',binding.research.path,'m0-synthetic-research-catalog-v1',
                     'workflow-knowledge',{'binding_sha256':binding.research.digest,'catalog_instance':binding.research.instance}),
@@ -132,7 +132,7 @@ def snapshot(paths):
 
 
 def sync_events(work,binding):
-    sources=[SourceBinding.enroll('workflow-dispatch','dispatch',work/'ledger.sqlite3','workflow-dispatch',('0011',)),
+    sources=[SourceBinding.enroll('workflow-dispatch','dispatch',work/'ledger.sqlite3','workflow-dispatch',('0012',)),
              SourceBinding.enroll('workflow-content','content',binding.content_path,binding.content_instance,('m0-content-synthetic-v1',))]
     for domain in ('research-scatter','research-content'):
         sources.append(SourceBinding.enroll(domain,'catalog',binding.research.catalog_root/(domain+'.sqlite3'),

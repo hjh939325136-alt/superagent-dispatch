@@ -30,8 +30,8 @@ def prepare(root):
     ledger=root/'ledger.sqlite3';store=SqliteStore(ledger,lease_ttl_seconds=10)
     task,_=store.submit(TaskSpec('manager-lab-read','synthetic.read',1,{},(),(),'synthetic','none',2))
     info=ledger.stat()
-    source('dispatch-synthetic','dispatch',ledger,'0011','manager-synthetic-ledger',
-           {'identity':{'device':info.st_dev,'inode':info.st_ino}})['accepted_schema_versions']=['0010','0011']
+    source('dispatch-synthetic','dispatch',ledger,'0012','manager-synthetic-ledger',
+           {'identity':{'device':info.st_dev,'inode':info.st_ino}})['accepted_schema_versions']=['0010','0011','0012']
     content=root/'content.sqlite3'
     with closing(Contract(content,create=True)) as contract:
         game=chain(contract,'game');editing=chain(contract,'ai-editing')

@@ -158,6 +158,8 @@ PRECOMMIT_CODES={'DEPENDENCY_REVOKED','DEPENDENCY_EXPIRED','DEPENDENCY_UNUSABLE'
 
 
 def configured(config):
+    if config.execution_route not in (None, 'local_synthetic'):
+        raise WorkflowError('WORKFLOW_EXECUTION_ROUTE_REQUIRED')
     component=config.components.get('research_content')
     if not config.synthetic or component is None:
         raise WorkflowError('SYNTHETIC_WORKFLOW_CONFIG_REQUIRED')

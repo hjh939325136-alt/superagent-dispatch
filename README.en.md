@@ -35,6 +35,10 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 After the content workflow runs, open `report.json` in its output directory to see the source references, sample draft, simulated review, and which events reached the task ledger.
 
+## What this update adds
+
+A single task ledger can now serve both local commands and a loopback HTTP coordinator, with each side claiming its own tasks. Mixed mode requires explicit activation by an operator. The regular examples still run in isolated mode. The [preview guide](M0_PREVIEW.en.md#isolated-and-mixed-execution) lists the remaining limits.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

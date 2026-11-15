@@ -25,3 +25,11 @@ The M0 Collector commands also support versioned requests and continue to accept
 - Collector `sync` and `adopt` accept version `0.1` and validate the request before reading the local configuration. The same format applies when syncing through Manager.
 - A gap still freezes sync for operator review. Check the reported state to see whether sync actually finished.
 - The preview guide explains requests, replies, and frozen states. The running service has yet to adopt these changes.
+
+## 0.1.1-m0.4 (2026-11-15)
+
+One task ledger can now explicitly enable mixed mode so local commands and a loopback HTTP coordinator each claim their own work.
+
+- The existing demos stay in isolated mode. Manager can query compatible new ledgers read-only, and the export format moves to v7.
+- In the synthetic scenario, a lost acknowledgement leaves the write task pending review without an automatic retry.
+- Approval administration, budget settlement, and final settlement of uncertain tasks remain unavailable in mixed mode. Domain recovery and switching the running service still need validation.

@@ -5,7 +5,7 @@ from datetime import timedelta
 from .binding import now, instant, token, fixed_ref
 from .readonly import readonly_db, SourceError
 
-SUPPORTED = {'0010', '0011'}
+SUPPORTED = {'0010', '0011', '0012'}
 TASK_FIELDS = 'task_id,kind,kind_version,track,status,fence,attempts,side_effect,access,created_at,updated_at,fingerprint'
 
 
@@ -24,6 +24,15 @@ def schema(db, source):
     version = db.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0]
     if version not in SUPPORTED or version not in source['accepted_schema_versions']:
         raise SourceError('source_schema_unsupported')
+    if version == '0012':
+        if not {'ledger_mode', 'route_audit'} <= available:
+            raise SourceError('source_schema_unsupported')
+        modes = db.execute('SELECT id,mode FROM ledger_mode').fetchall()
+        if len(modes) != 1 or modes[0][0] != 1 or modes[0][1] not in ('isolated', 'mixed'):
+            raise SourceError('source_schema_unsupported')
+        for table in ('tasks', 'devices', 'schedules', 'schedule_firings'):
+            if 'execution_route' not in {row[1] for row in db.execute(f'PRAGMA table_info({table})')}:
+                raise SourceError('source_schema_unsupported')
     if db.execute("SELECT 1 FROM tasks WHERE access IS NOT 'synthetic' LIMIT 1").fetchone():
         raise SourceError('source_scope_not_synthetic')
     return version, available

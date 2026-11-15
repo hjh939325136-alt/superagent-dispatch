@@ -50,7 +50,7 @@ class CollectorTests(unittest.TestCase):
                 [(task.task_id,'queued','queued',0,'fixture','fixture',at)]*999)
         alias=self.root/'target-alias.db'
         os.link(self.target,alias)
-        binding=SourceBinding.enroll('self-collect','dispatch',alias,'instance-one',('0011',))
+        binding=SourceBinding.enroll('self-collect','dispatch',alias,'instance-one',('0012',))
         connect=self.collector._connect
 
         def small_cache():
@@ -155,7 +155,7 @@ Collector(sys.argv[1]).sync(b,'hook_events',fault=lambda stage:os._exit(73) if s
         export_bundle(cfg,package)
         dest=SimpleNamespace(db_path=self.root/'import.db',artifact_root=self.root/'import-cas')
         report=import_bundle(dest,package,SqliteStore(dest.db_path,lease_ttl_seconds=10))
-        self.assertEqual(report['schema'],'sa_dispatch.bundle.v6')
+        self.assertEqual(report['schema'],'sa_dispatch.bundle.v7')
         restored=ledger(dest.db_path)
         self.assertEqual(restored['collector_cursors'][0]['authority'],'historical_only')
         self.assertEqual(restored['collector_gaps'],self.rows('collector_gaps'))
@@ -208,8 +208,11 @@ print(json.dumps(ledger(c.db_path)))
         self.assertEqual(before['schema_migrations'][-1]['version'],'0010')
         SqliteStore(path,lease_ttl_seconds=10);after=ledger(path)
         for name,rows in before.items():
+            if name in ('tasks','schedules','schedule_firings'):
+                rows=[dict(row,execution_route=None) for row in rows]
             self.assertEqual(after[name][:len(rows)] if name=='schema_migrations' else after[name],rows,name)
-        self.assertEqual(after['schema_migrations'][-1]['version'],'0011')
+        self.assertEqual([row['version'] for row in after['schema_migrations'][len(before['schema_migrations']):]],
+                         ['0011','0012'])
         self.assertEqual(after['collector_cursors'],[]);self.assertEqual(after['collector_gaps'],[])
 
     def test_real_dispatch_streams_project_only_metadata(self):
@@ -221,7 +224,7 @@ print(json.dumps(ledger(c.db_path)))
             c.execute('INSERT INTO schedule_events(schedule_id,version,kind,at,detail_code) VALUES(?,?,?,?,?)',('fixture',1,'schedule.exhausted',at,'max_slots_reached'))
             c.execute('INSERT INTO reconciliations VALUES(?,?,?,?,?,?,?,?)',('rec-one',task.task_id,0,'human','decided',ref,'fixture',at))
             c.execute('INSERT INTO host_events VALUES(?,?,?,?)',(task.task_id,0,1,ref))
-        binding=SourceBinding.enroll('dispatch-fixture','dispatch',path,'trusted-ledger-one',('0011',))
+        binding=SourceBinding.enroll('dispatch-fixture','dispatch',path,'trusted-ledger-one',('0012',))
         before=path.read_bytes()
         for stream in ('events','control_events','schedule_events','reconciliations','host_events'):
             result=self.collector.sync(binding,stream)

@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from dataclasses import asdict
+from types import SimpleNamespace
 import os
 from pathlib import Path
 import sys
@@ -80,3 +81,46 @@ class DispatchFlowTests(unittest.TestCase):
                 executor.recover()
             self.assertEqual(store.get_task(task.task_id).status, "succeeded")
             self.assertEqual(store.get_task(task.task_id).result["receipt"], artifact)
+
+    def test_recovery_skips_other_adapters_before_loading_receipt(self):
+        for variant in ('unknown_kind', 'wrong_version', 'disabled', 'dedicated',
+                        'foreign_device', 'forged_lease_owner'):
+            with self.subTest(variant=variant), self.work() as (_, config, store, executor):
+                # A separate trusted submitter can have kinds this executor does not own.
+                raw = SqliteStore(config.db_path, lease_ttl_seconds=60)
+                name = 'other.adapter' if variant == 'unknown_kind' else 'hotspot.topic_fetch'
+                version = 2 if variant == 'wrong_version' else 1
+                task, _ = raw.submit(TaskSpec('foreign', name, version, {}, (),
+                    config.capabilities, 'synthetic', 'none', 1), side_effect='external')
+                owner = 'other-device' if variant in ('foreign_device', 'forged_lease_owner') else config.device_id
+                raw.register_device(owner, config.capabilities)
+                lease = raw.claim(owner)
+                if variant in ('disabled', 'dedicated'):
+                    executor.kinds = {name: SimpleNamespace(version=1,
+                        enabled=variant != 'disabled', dedicated_runner=variant == 'dedicated')}
+                if variant == 'forged_lease_owner':
+                    from dataclasses import replace
+                    lease = replace(lease, device_id=config.device_id)
+                executor.log(lease, 'result', artifact='sha256:' + '0' * 64, exit=0)
+                before = raw.snapshot()
+                with patch.object(executor.artifacts, 'get', side_effect=AssertionError('foreign receipt read')), \
+                     patch.object(executor.runner, 'run_component', side_effect=AssertionError('foreign invocation')):
+                    self.assertEqual(executor.recover(), [])
+                self.assertEqual(raw.snapshot(), before)
+
+    def test_reconcile_rejects_foreign_owner_and_unregistered_kind(self):
+        for foreign_owner in (False, True):
+            with self.subTest(foreign_owner=foreign_owner), self.work() as (_, config, store, executor):
+                raw = SqliteStore(config.db_path, lease_ttl_seconds=60)
+                name = 'hotspot.topic_fetch' if foreign_owner else 'other.adapter'
+                task, _ = raw.submit(TaskSpec('unknown', name, 1, {}, (),
+                    config.capabilities, 'synthetic', 'none', 1), side_effect='external')
+                owner = 'other-device' if foreign_owner else config.device_id
+                raw.register_device(owner, config.capabilities)
+                lease = raw.claim(owner)
+                raw.mark_unknown(lease.lease_id, lease.fence, 'interrupted', owner)
+                before = raw.snapshot()
+                with patch.object(executor, '_original_request', side_effect=AssertionError('foreign intent read')), \
+                     patch.object(executor.runner, 'run_component', side_effect=AssertionError('foreign invocation')):
+                    self.assertEqual(executor.reconcile(raw.get_task(task.task_id)), {'verdict': 'still_unknown'})
+                self.assertEqual(raw.snapshot(), before)

@@ -57,6 +57,8 @@ class FrozenLegacyBundleTests(unittest.TestCase):
             expected = copy.deepcopy(original)
             if table == 'schedules':
                 for row in expected: row.update(enabled=0,max_slots=None)
+            if table in ('tasks','schedules','schedule_firings'):
+                for row in expected: row['execution_route'] = None
             if table == 'schema_migrations':
                 actual_by_id = {row['version']:row for row in after[table]}
                 for row in expected: self.assertEqual(actual_by_id[row['version']],row)

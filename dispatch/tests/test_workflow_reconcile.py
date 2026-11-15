@@ -13,6 +13,7 @@ class WorkflowLookupTests(unittest.TestCase):
     def prepare(self,change=None,request_change=None,validator=None):
         task,_=self.unknown();base=KINDS[task.kind]
         class Kind:
+            enabled=True
             component=base.component
             version=base.version
             side_effect=base.side_effect

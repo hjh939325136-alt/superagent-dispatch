@@ -128,6 +128,12 @@ def main(argv=None, *, plugins=None):
                 from .service import serve
                 serve(config, kinds, args.identities, args.port, schedules=args.schedules)
                 return 0
+            if config.execution_route == 'http_synthetic' and args.action in (
+                    'submit', 'device-register', 'run-once', 'recover', 'reconcile',
+                    'claude-run', 'claude-settle', 'host-run', 'host-cancel', 'host-settle'):
+                raise ValueError('HTTP route execution requires the authenticated coordinator entry')
+            if config.execution_route == 'local_synthetic' and args.action.startswith('schedule-'):
+                raise ValueError('local mixed route does not support schedule commands')
             if args.action.startswith('schedule-') and (not config.synthetic or config.components):
                 raise ValueError('schedule commands require a dedicated synthetic configuration without components')
             if args.action == 'prove-idempotency' and not config.synthetic:
@@ -142,7 +148,7 @@ def main(argv=None, *, plugins=None):
                 if not config.synthetic or config.components or 'host_fixture' not in config.plugins:
                     raise ValueError('host lifecycle requires an isolated synthetic host_fixture configuration without components')
             store = SqliteStore(config.db_path, lease_ttl_seconds=config.lease_ttl_seconds, kinds=kinds,
-                                component_config=config)
+                                component_config=config, route=config.execution_route)
             executor = Executor(config, store, ComponentRunner(config), kinds)
             action = args.action
             if action == 'claude-settle':

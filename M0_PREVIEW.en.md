@@ -28,6 +28,12 @@ Collector `sync` and `adopt`, including calls through `manager sync` and `manage
 
 `ok: true` means the command was processed. Check `result.state` for the actual sync outcome. If the stream is `frozen`, the operator should inspect the source and gap before deciding whether to explicitly resume with `adopt`. Source authorization and login identity are separate from the version field.
 
+## Isolated and mixed execution
+
+Ledger schema `0012` adds optional mixed mode, and the export format moves to `bundle.v7`. In mixed mode, local research and content commands and a loopback HTTP coordinator can use one ledger while claiming their own routed tasks. Manager can query compatible synthetic `0012` ledgers read-only. Activation is an explicit maintenance action that checks evidence against the ledger's current state. The regular examples remain in isolated mode.
+
+Approval administration, budget settlement, and final settlement of uncertain results are still unavailable in mixed mode. In the verified example, an uncertain task is held for review without an automatic retry. Domain recovery, migration of real data, and switching the running service still require separate validation. This update publishes development preview source, and the running service has yet to adopt it.
+
 ## Verify Dispatch
 
 In an environment without a custom `PYTHONPATH` or `PYTHONHOME`, run from the preview root:

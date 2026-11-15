@@ -34,7 +34,8 @@ class ClaudeIntegrationTests(unittest.TestCase):
         self.config_file=self.root/'config.toml'
         fields={**self.config.__dict__}
         fields={key:str(value) if isinstance(value,Path) else list(value) if isinstance(value,tuple) else value for key,value in fields.items()}
-        self.config_file.write_text('\n'.join(key+' = '+json.dumps(value) for key,value in fields.items() if key!='components')+'\n[components]\n',encoding='utf-8')
+        self.config_file.write_text('\n'.join(key+' = '+json.dumps(value) for key,value in fields.items()
+                                              if key!='components' and value is not None)+'\n[components]\n',encoding='utf-8')
         self.store=SqliteStore(self.config.db_path,lease_ttl_seconds=20,kinds=KINDS)
         self.store.register_device('fixture',['claude.synthetic'])
         self.artifacts=ArtifactStore(self.config.artifact_root)
@@ -75,7 +76,7 @@ class ClaudeIntegrationTests(unittest.TestCase):
     def test_bundle_v4_includes_raw_init_and_result_but_not_execution_path(self):
         report=self.finish();bundle=self.root/'package'
         manifest=export_bundle(self.config,bundle)
-        self.assertEqual(manifest['schema'],'sa_dispatch.bundle.v6')
+        self.assertEqual(manifest['schema'],'sa_dispatch.bundle.v7')
         for field in ('prompt_ref','stdout_ref','init_ref'):self.assertIn(report[field],manifest['artifacts'])
         row=json.loads((bundle/'claude_attempts.jsonl').read_text())
         self.assertEqual(row['run_dir'],'');self.assertEqual(row['execution_authority'],'historical_only')
@@ -137,10 +138,11 @@ class ClaudeIntegrationTests(unittest.TestCase):
         # Structural compatibility fixture; independently frozen v1/v2 tests remain separate.
         self.store.cancel(self.task.task_id,'fixture')
         source=ledger(self.store.path);rows={key:source[key] for key in V3_TABLES}
-        rows['schema_migrations']=[r for r in rows['schema_migrations'] if r['version']!='0009']
+        rows['schema_migrations']=[r for r in rows['schema_migrations'] if r['version'] in ('0007','0008')]
         package=self.root/'v3';package.mkdir();files={}
         for name,records in rows.items():
-            raw=b''.join(receipt_bytes(row)+b'\n' for row in records)
+            raw=b''.join(receipt_bytes({key:value for key,value in row.items() if key!='execution_route'})
+                         + b'\n' for row in records)
             filename=name+'.jsonl';(package/filename).write_bytes(raw);files[filename]=sha256_ref(raw)
         ref=self.task.input_refs[0]['hash'];ArtifactStore(package/'artifacts').put(self.artifacts.get(ref))
         manifest={'schema':V3_FORMAT,'files':files,'artifacts':[ref],
