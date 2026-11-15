@@ -84,6 +84,8 @@ The preview includes a [one-shot model task example](tools/m0_agent/README.en.md
 
 ## Sandbox and delivery progress
 
+A systemd timer completed one synthetic task in an isolated Debian sandbox. Reinstalling and starting the service again kept one task and one attempt in the ledger. Debian passed 46 tests. Windows passed 45 and skipped one POSIX-only check. A simulator supplied the model response. Real model calls: 0.
+
 Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.
 
 A separate Debian installation rehearsal used a test credential to verify first installation, repeat installation, and credential loading after a service restart. The installation image, machine reboot, and long-running operation still need validation.

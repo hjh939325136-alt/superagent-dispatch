@@ -16,4 +16,4 @@
 python -X utf8 -B -c "import sys, unittest; sys.path[:0] = ['dispatch', 'dispatch/tests']; unittest.main(module=None)" tools.m0_agent.test_deepseek_client tools.m0_agent.test_provider_process tools.m0_agent.test_worker test_scheduler test_scheduler_bounds test_scheduler_process test_scheduler_routing
 ```
 
-测试覆盖单槽竞争、重复触发、成功与超时、凭据通过子进程管道传递，以及原调度行为。连接定时服务和长期运行仍待验证。
+测试覆盖单槽竞争、重复触发、成功与超时、凭据通过子进程管道传递，以及原调度行为。独立 Debian 定时安装演练的范围见[开发更新](../../DEVELOPMENT_UPDATES.md)。长期运行仍待验证。

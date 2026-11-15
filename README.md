@@ -1,6 +1,6 @@
 # SuperAgent 开发预览
 
-**简体中文** · [Read in English](README.en.md)
+**简体中文** · [Read in English](README.en.md) · [Agent 指南](AGENTS.md) · [文档索引](llms.txt)
 
 **SuperAgent 帮你把几个工具串起来做一件事，并能回查每一步。** 它在本机记录任务由谁领取、进展如何、结果放在哪里。
 
@@ -71,3 +71,5 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 交付方向是使用自动安装 U 盘，在现场把系统安装到已核对的新空 SSD。安装镜像和虚拟机验收还待完成，可交付的安装 U 盘尚未就绪。
 
 [预览技术说明](M0_PREVIEW.md) · [中文开发更新](DEVELOPMENT_UPDATES.md)
+
+如果这个项目帮到了你，欢迎[在 GitHub 点 Star](https://github.com/hjh939325136-alt/superagent-dispatch/tree/preview/m0-source)，或 [Fork 仓库](https://github.com/hjh939325136-alt/superagent-dispatch/fork) 来适配自己的流程。

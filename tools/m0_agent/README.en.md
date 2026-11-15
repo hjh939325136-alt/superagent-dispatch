@@ -16,4 +16,4 @@ Use Python 3.11 or later. Run this from the preview source root:
 python -X utf8 -B -c "import sys, unittest; sys.path[:0] = ['dispatch', 'dispatch/tests']; unittest.main(module=None)" tools.m0_agent.test_deepseek_client tools.m0_agent.test_provider_process tools.m0_agent.test_worker test_scheduler test_scheduler_bounds test_scheduler_process test_scheduler_routing
 ```
 
-The tests cover concurrent claims for one slot, repeated triggers, success and timeout, credential transfer over a subprocess pipe, and existing scheduling behavior. A timer service and long-running operation still need validation.
+The tests cover concurrent claims for one slot, repeated triggers, success and timeout, credential transfer over a subprocess pipe, and existing scheduling behavior. See the [development updates](../../DEVELOPMENT_UPDATES.en.md) for the isolated Debian timer rehearsal. Long-running operation still needs validation.

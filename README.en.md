@@ -1,6 +1,6 @@
 # SuperAgent Development Preview
 
-[阅读简体中文版](README.md) · **English**
+[阅读简体中文版](README.md) · **English** · [Agent guide](AGENTS.md) · [Documentation index](llms.txt)
 
 **SuperAgent helps several tools work on one job and lets you check what happened at each step.** It records who picked up a task, how far it got, and where its results are stored on your computer.
 
@@ -71,3 +71,5 @@ The public source has been tested with local examples on Windows and isolated De
 The delivery plan is to use an automated installation USB drive on-site with a verified new blank SSD. The installation image and virtual-machine validation are still pending, so the USB drive is not ready for delivery.
 
 [Technical preview guide](M0_PREVIEW.en.md) · [Development updates](DEVELOPMENT_UPDATES.en.md)
+
+If you find this project useful, consider [starring it on GitHub](https://github.com/hjh939325136-alt/superagent-dispatch/tree/preview/m0-source) or [forking it](https://github.com/hjh939325136-alt/superagent-dispatch/fork) to adapt it to your workflow.

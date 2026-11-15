@@ -111,3 +111,9 @@ This release adds a one-shot model task example. Use synthetic text to rehearse 
 - The worker runs against an explicitly approved text reference and hash. Repeated triggers for the same grant and time slot reuse the existing task.
 - The DeepSeek HTTPS client can run in a subprocess with a deadline for the whole call. A simulated timeout leaves the outcome unknown to avoid an automatic resubmission.
 - Scheduling and task claims can filter by schedule or task ID. The public package passed 62 tests on each of Windows and Debian, with zero real model calls. Timer service integration and long-running operation still need validation.
+
+## 2026-11-16 Scheduled task installation rehearsal
+
+A systemd timer completed one synthetic task in an isolated Debian sandbox. Reinstalling and starting the service again kept one task and one attempt in the ledger. Debian passed 46 tests. Windows passed 45 and skipped one POSIX-only check. A simulator supplied the model response. Real model calls: 0.
+
+The public preview continues to use the one-shot model task example. Compatibility with existing preview ledgers, the installation image, and long-running operation still need validation.
