@@ -97,3 +97,9 @@ The preview adds experimental tools for staging synthetic domains and resuming i
 - Staging prepares a separate synthetic research and content directory and checks its configuration and bindings. The source ledger and evidence store stay untouched.
 - Persistent phases coordinate stopping writes, activation, and configuration replacement. Tests use real SQLite/CAS with synthetic adapters and simulate interruption by raising exceptions at 24 points.
 - A real Debian adapter, a complete recovery set, systemd start guards, and live Collector adoption are still pending. The dedicated sandbox still runs in isolated mode.
+
+## 2026-11-16 Adapter and installation rehearsal progress
+
+Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.
+
+A separate Debian installation rehearsal used a test credential to verify first installation, repeat installation, and credential loading after a service restart. The installation image, machine reboot, and long-running operation still need validation.

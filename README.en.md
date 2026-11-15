@@ -1,10 +1,17 @@
-# SuperAgent M0 Source Preview
+# SuperAgent Development Preview
 
-[简体中文](README.md) · **English**
+[阅读简体中文版](README.md) · **English**
 
-**SuperAgent aims to make work traceable when it spans several tools.** Imagine making a short video from a collection of references. You find relevant material, produce a draft, send it for review, and later check which references it used and where review stopped.
+**SuperAgent helps several tools work on one job and lets you check what happened at each step.** It records who picked up a task, how far it got, and where its results are stored on your computer.
 
-This M0 preview walks through that workflow on one computer with sample data. Dispatch tracks tasks and status, Manager finds material and answers queries, and Collector adds summaries and references for events such as sample script generation and simulated review to the task ledger. Syncing again does not duplicate events. For single-machine task coordination alone, start with the [Dispatch v0.1.0 overview](https://github.com/hjh939325136-alt/superagent-dispatch/blob/main/README.en.md).
+For example, to make a short video, you can find relevant references, generate a sample script, and simulate a human review. After the demo, open one report to see which references the script used and how far review progressed.
+
+| What you want to try | Where to start |
+| --- | --- |
+| Give local scripts tasks and check progress and results | [Stable Dispatch v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/blob/main/README.en.md) |
+| Try searching references, generating a sample script, and simulating review | The examples below use the project's built-in synthetic data |
+
+This is the first development milestone (M0). The demos run on one computer. For how the components work together and what is available today, see the [technical preview guide](M0_PREVIEW.en.md).
 
 ## Try an example
 
@@ -51,9 +58,11 @@ A separate central maintenance entry point can configure shared budgets, record 
 
 Offline checkpoints can now preserve supported ignored late receipts after an explicit per-row review. They remain audit history and cannot establish task completion. A synthetic test also verifies freezing and explicitly resuming each Collector stream across `0011` to `0012`.
 
-This preview also includes an [experimental maintenance toolkit](tools/m0_native_mixed/README.en.md) for staging synthetic research and content directories and rehearsing interrupted mixed-mode activation. The real Debian adapter and live Collector adoption are still in development.
+This preview also includes an [experimental maintenance toolkit](tools/m0_native_mixed/README.en.md) for staging synthetic research and content directories and rehearsing interrupted mixed-mode activation. Live Collector adoption still needs validation.
 
 ## Current status
+
+The public preview includes local examples and experimental maintenance tools. See [development updates](DEVELOPMENT_UPDATES.en.md) for the latest adapter and installation rehearsal progress.
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
 

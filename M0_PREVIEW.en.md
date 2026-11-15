@@ -78,9 +78,13 @@ This public source preview was tested with local synthetic examples on Windows a
 
 ## Experimental mixed-mode maintenance
 
-The [maintenance toolkit](tools/m0_native_mixed/README.en.md) stages a separate synthetic domain and coordinates one mixed-mode activation through persistent phases. Tests use real SQLite, CAS, and activation transactions with synthetic service and recovery adapters. Exceptions simulate interruption at 24 points. Physical power-loss testing, a real Debian adapter, a complete recovery set, systemd start guards, and live Collector adoption remain pending.
+The [maintenance toolkit](tools/m0_native_mixed/README.en.md) stages a separate synthetic domain and coordinates one mixed-mode activation through persistent phases. Tests use real SQLite, CAS, and activation transactions with synthetic service and recovery adapters. Exceptions simulate interruption at 24 points. The public toolkit covers simulated scenarios. Physical power loss, actual systemd start guards, and live Collector adoption still need validation.
 
 ## Sandbox and delivery progress
+
+Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.
+
+A separate Debian installation rehearsal used a test credential to verify first installation, repeat installation, and credential loading after a service restart. The installation image, machine reboot, and long-running operation still need validation.
 
 A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
 
