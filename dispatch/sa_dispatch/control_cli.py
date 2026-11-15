@@ -4,9 +4,9 @@ python -m sa_dispatch.control_cli --ledger ledger.sqlite3 --artifacts artifacts 
 
 Request: {"schema":"sa_dispatch.control_request.v1","synthetic":true,
           "operation":"status","params":{}}
-Operation names and params match the seven documented ControlPolicy methods.
+Operation names and params are restricted to the ControlPolicy allowlist.
 No message/host invocation, claim or arbitrary method dispatch is exposed.
-status() deliberately commits local handoff expiry updates as its API specifies.
+Isolated status refreshes local handoff expiry. Mixed status is route-scoped and read-only.
 """
 import argparse
 from contextlib import closing
@@ -21,12 +21,13 @@ import sys
 from .artifacts import ArtifactError, ArtifactStore
 from .control_policy import ControlPolicy
 from .models import DispatchError
+from .routing import ROUTES
 from .store_sqlite import SqliteStore
 
 REQUEST_SCHEMA = 'sa_dispatch.control_request.v1'
 RESPONSE_SCHEMA = 'sa_dispatch.control_response.v1'
 MAX_REQUEST_BYTES = 64 * 1024
-OPERATIONS = frozenset(('budget_upsert', 'bind_task', 'approval_decide', 'settle',
+OPERATIONS = frozenset(('budget_upsert', 'bind_task', 'approval_decide', 'mark_uncertain', 'settle',
                        'handoff_offer', 'handoff_transition', 'status'))
 
 
@@ -110,11 +111,15 @@ def execute_request(store, artifacts, request_dict):
     if not isinstance(artifacts, ArtifactStore):
         raise ControlRequestError('an explicit local ArtifactStore is required')
     _local_path(artifacts.root)
-    policy = ControlPolicy(store, artifacts=artifacts)
+    route = store.route
+    policy = ControlPolicy(store, artifacts=artifacts, authority='route_task' if route else None)
     result = getattr(policy, operation)(**params)
     if operation == 'approval_decide': result = {'approval_id': result}
-    return {'operation': operation, 'result': result, 'scope': 'trusted_local_synthetic',
-            'messages_sent': 0, 'status_refreshes_handoff_expiry': operation == 'status'}
+    response = {'operation': operation, 'result': result, 'scope': 'trusted_local_synthetic',
+                'messages_sent': 0, 'status_refreshes_handoff_expiry': operation == 'status' and not route}
+    if route:
+        response.update(scope='trusted_local_synthetic_route', execution_route=route)
+    return response
 
 
 class _Parser(argparse.ArgumentParser):
@@ -126,6 +131,7 @@ def main(argv=None):
     parser.add_argument('--ledger', required=True)
     parser.add_argument('--artifacts', required=True)
     parser.add_argument('--request', required=True)
+    parser.add_argument('--route', choices=ROUTES)
     try:
         args = parser.parse_args(argv)
         request = load_request(args.request)
@@ -133,7 +139,7 @@ def main(argv=None):
         # Fail before SqliteStore can create/migrate an unintended or real ledger.
         ledger = _assert_synthetic_ledger(args.ledger)
         artifacts = ArtifactStore(_local_path(args.artifacts))
-        store = SqliteStore(ledger, lease_ttl_seconds=60)
+        store = SqliteStore(ledger, lease_ttl_seconds=60, route=args.route)
         response = {'schema': RESPONSE_SCHEMA, 'ok': True, **execute_request(store, artifacts, request)}
         code = 0
     except (DispatchError, ArtifactError, OSError, ValueError, TypeError, sqlite3.Error) as exc:

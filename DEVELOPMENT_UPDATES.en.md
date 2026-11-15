@@ -33,3 +33,11 @@ One task ledger can now explicitly enable mixed mode so local commands and a loo
 - The existing demos stay in isolated mode. Manager can query compatible new ledgers read-only, and the export format moves to v7.
 - In the synthetic scenario, a lost acknowledgement leaves the write task pending review without an automatic retry.
 - Approval administration, budget settlement, and final settlement of uncertain tasks remain unavailable in mixed mode. Domain recovery and switching the running service still need validation.
+
+## 0.1.1-m0.5 (2026-11-15)
+
+Mixed mode can record per-task approvals and settle each task’s usage against evidence.
+
+- Approvals stay with their original task, new rules cannot weaken existing constraints, and usage settlement stays within the route. Read-only status shows tasks by route and labels shared totals as ledger-wide.
+- Settling usage leaves an uncertain business outcome pending review, with no automatic replay of the write.
+- Global budget configuration, handoff administration, and automatic host settlement remain unavailable. The existing demos stay in isolated mode. The running service has yet to adopt the update.

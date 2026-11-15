@@ -1,6 +1,7 @@
 """Normal research/content CLI and real loopback HTTP on one temporary ledger."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 import hashlib
 import http.client as http_client
 import json
@@ -17,6 +18,7 @@ from knowledge.m0_content.run_research_pipeline_lab import Commands, now, prepar
 from knowledge.m0_content.workflow_binding import request_base
 from sa_dispatch.artifacts import ArtifactStore
 from sa_dispatch.executor import receipt_bytes
+from sa_dispatch.control_policy import ControlPolicy
 from sa_dispatch.routing import activate_mixed, activation_manifest
 from sa_dispatch.store_sqlite import SqliteStore
 from sa_dispatch.transport import CoordinatorAPI, create_server
@@ -30,6 +32,11 @@ class MixedResearchCliTests(unittest.TestCase):
             binding, config = prepare(work)
             cas = ArtifactStore(work / 'artifacts')
             isolated = SqliteStore(work / 'ledger.sqlite3', lease_ttl_seconds=30)
+            policy = ControlPolicy(isolated, artifacts=cas)
+            expiry = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+            policy.budget_upsert('fixture-budget', period='fixture', unit='synthetic_units',
+                limit_units=10, starts_at=(datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+                ends_at=expiry)
             with closing(isolated._connect()) as conn:
                 manifest = activation_manifest(conn, actor='synthetic-integration', bindings={})
             evidence = cas.put(receipt_bytes(manifest))
@@ -86,15 +93,46 @@ class MixedResearchCliTests(unittest.TestCase):
                     script = local.execute(script_task)
                     self.assertEqual(script['generation'], 'template_synthetic')
                     self.assertIs(script['ai_generated'], False)
+                    # Normal CLI approvals and final usage stay bound to this task and route.
+                    approval_task = local.submit('content.approval_record', common | {'script_ref': script['script_ref']},
+                                                 'approval', parent=script_task['task_id'], refs=[script['script_ref']])
+                    local.control('bind_task', {'task_id': approval_task['task_id'], 'approval_scope': 'script_ready',
+                                               'budget_id': 'fixture-budget', 'reserve_units': 2})
+                    self.assertIsNone(local.cli('run-once')['task'])
+                    proof = {'schema': 'm0.synthetic_operator_approval.v1', 'synthetic': True,
+                             'task_id': approval_task['task_id'], 'fingerprint': approval_task['fingerprint'],
+                             'scope': 'script_ready', 'decision': 'approved', 'actor': 'synthetic-operator',
+                             'expires_at': expiry, 'human_reviewed': False, 'publish_authorized': False}
+                    approval_ref = cas.put(receipt_bytes(proof))
+                    local.control('approval_decide', {'task_id': approval_task['task_id'], 'scope': 'script_ready',
+                                  'decision': 'approved', 'actor': 'synthetic-operator',
+                                  'evidence_ref': approval_ref, 'expires_at': expiry})
+                    approved = local.execute(approval_task)
+                    self.assertEqual(approved['control_approval']['proof_hash'], approval_ref)
+                    def settle(task, actual_units):
+                        usage_ref = cas.put(receipt_bytes({'synthetic': True, 'task_id': task['task_id'],
+                            'fence': 1, 'budget_id': 'fixture-budget', 'fingerprint': task['fingerprint'],
+                            'actual_units': actual_units, 'final_usage': True}))
+                        return local.control('settle', {'task_id': task['task_id'], 'fence': 1,
+                            'actual_units': actual_units, 'evidence_ref': usage_ref, 'actor': 'synthetic-operator'})
+                    settle(approval_task, 2)
                     # The implementation gate must hold an ambiguous write, not launch it again.
                     ambiguous = local.submit('content.script_from_context', common | {'template_id': binding.template_id},
                                              'lost-ack', parent=assembled['task_id'], refs=selected)
+                    local.control('bind_task', {'task_id': ambiguous['task_id'],
+                        'budget_id': 'fixture-budget', 'reserve_units': 1})
                     local.execute(ambiguous, expected='unknown', crash=True)
                     self.assertIsNone(local.cli('run-once')['task'])
                     self.assertEqual(local.cli('reconcile', ambiguous['task_id'])['verdict'], 'still_unknown')
                     held = http.get_task(ambiguous['task_id'])
                     self.assertEqual((held.status, held.attempts, held.execution_route),
                                      ('unknown', 1, 'local_synthetic'))
+                    settle(ambiguous, 1)
+                    self.assertEqual(http.get_task(ambiguous['task_id']).status, 'unknown')
+                    status = local.control('status', {})
+                    self.assertFalse(status['status_refreshes_handoff_expiry'])
+                    self.assertEqual(status['result']['budget_totals_scope'], 'ledger')
+                    self.assertEqual([(b['used_units'], b['reserved_units']) for b in status['result']['budgets']], [(3, 0)])
                     with closing(http._connect()) as conn:
                         misplaced = conn.execute('''SELECT COUNT(*) FROM leases l JOIN tasks t USING(task_id)
                             WHERE (l.device_id='http-worker') != (t.execution_route='http_synthetic')''').fetchone()[0]

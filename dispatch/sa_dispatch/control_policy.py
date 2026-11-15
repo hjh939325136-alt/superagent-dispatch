@@ -3,6 +3,7 @@
 No host or conversation is contacted. before_claim joins the caller's write
 transaction, so reservation and the lease either both commit or both roll back.
 """
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta
 import json
 import re
@@ -10,6 +11,7 @@ from uuid import uuid4
 
 from .clock import timestamp
 from .models import DispatchError
+from .routing import ROUTES, RouteRejected, ledger_mode
 from .unified_events import _ulid
 
 SCHEMA = """
@@ -159,10 +161,61 @@ def before_claim(conn, task, next_fence, actor, at):
 
 
 class ControlPolicy:
-    def __init__(self, store, *, artifacts=None):
+    def __init__(self, store, *, artifacts=None, authority=None):
+        if authority not in (None, 'route_task'):
+            raise RouteRejected('invalid control policy authority')
         self.store, self.artifacts = store, artifacts
+        self._authority = authority
+        with closing(store._connect()) as conn:
+            conn.execute('BEGIN')
+            if ledger_mode(conn) == 'mixed':
+                self._require_route_authority()
+                self._validate_mixed_schema(conn)
+                return
         with store._tx() as conn:
             initialize_schema(conn)
+
+    def _require_route_authority(self):
+        if self._authority != 'route_task' or self.store.route not in ROUTES:
+            raise RouteRejected('mixed control policy requires explicit route_task authority and a bound route')
+
+    @staticmethod
+    def _validate_mixed_schema(conn):
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        required = {
+            'tasks': 'task_id execution_route access egress fingerprint status attempts',
+            'control_budgets': 'budget_id period unit limit_units reserved_units used_units starts_at ends_at',
+            'control_task_rules': 'task_id fingerprint budget_id reserve_units approval_scope approval_id',
+            'control_approvals': 'approval_id task_id fingerprint scope decision actor evidence_ref expires_at at',
+            'control_reservations': 'task_id fence budget_id fingerprint reserved_units actual_units state '
+                                    'evidence_ref created_at settled_at uncertain_at',
+            'control_handoffs': 'handoff_id from_conv to_conv project_id scope scope_refs_json authorized_by '
+                                'authorization_ref expires_at state receipt_ref evidence_refs_json created_at updated_at',
+            'control_events': 'seq event_id event_key kind task_id fence actor at refs_json detail_code',
+        }
+        for table, columns in required.items():
+            present = {row[1] for row in conn.execute(f'PRAGMA table_info({table})')}
+            if table not in tables or not set(columns.split()) <= present:
+                raise RouteRejected('mixed control policy requires an initialized control schema')
+
+    def _require_isolated(self, operation):
+        if self.store.routing_mode() == 'mixed':
+            raise RouteRejected(f'{operation} is restricted to an isolated control ledger')
+
+    @contextmanager
+    def _task_tx(self, task_id):
+        # The locked check handles activation after a policy was constructed.
+        if self.store.routing_mode() == 'mixed':
+            self._require_route_authority()
+        with self.store._tx(execution=True) as conn:
+            mixed = ledger_mode(conn) == 'mixed'
+            if mixed:
+                self._require_route_authority()
+                task = conn.execute('SELECT * FROM tasks WHERE task_id=?', (task_id,)).fetchone()
+                self.store.require_task_route(task, conn=conn)
+                if task['access'] != 'synthetic' or task['egress'] != 'none':
+                    raise DispatchError('policy supports synthetic no-egress tasks only')
+            yield conn, mixed
 
     def _artifact(self, ref):
         _hash(ref)
@@ -180,6 +233,7 @@ class ControlPolicy:
         return row
 
     def budget_upsert(self, budget_id, *, period, unit, limit_units, starts_at, ends_at):
+        self._require_isolated('budget_upsert')
         for value in (budget_id,period,unit): _id(value)
         _units(limit_units)
         start,end = _time(starts_at),_time(ends_at)
@@ -199,10 +253,29 @@ class ControlPolicy:
         if budget_id is None and reserve_units: raise DispatchError('reserve units require a budget')
         if approval_scope: _id(approval_scope)
         if approval_id and not approval_scope: raise DispatchError('approval id requires a scope')
-        with self.store._tx() as conn:
+        with self._task_tx(task_id) as (conn, mixed):
             task = self._task(conn,task_id)
             if task['status'] not in ('queued','waiting_device') or task['attempts']:
                 raise DispatchError('bind policy before the first attempt only')
+            if mixed:
+                if budget_id is not None:
+                    _id(budget_id)
+                if approval_scope is not None:
+                    _id(approval_scope)
+                if budget_id is None and approval_scope is None:
+                    raise DispatchError('mixed control rules require a budget or approval scope')
+                previous = conn.execute('''SELECT budget_id,reserve_units,approval_scope,approval_id
+                    FROM control_task_rules WHERE task_id=?''', (task_id,)).fetchone()
+                if previous and tuple(previous)[:3] != (budget_id, reserve_units, approval_scope):
+                    raise DispatchError('existing mixed control requirements are immutable')
+                if approval_id is None and previous:
+                    approval_id = previous['approval_id']
+                if approval_id is not None:
+                    _id(approval_id)
+                    approval = conn.execute('''SELECT task_id,fingerprint,scope FROM control_approvals
+                        WHERE approval_id=?''', (approval_id,)).fetchone()
+                    if not approval or tuple(approval) != (task_id, task['fingerprint'], approval_scope):
+                        raise DispatchError('approval must identify the owning task, fingerprint and scope')
             conn.execute('''INSERT INTO control_task_rules VALUES(?,?,?,?,?,?) ON CONFLICT(task_id)
                 DO UPDATE SET fingerprint=excluded.fingerprint,budget_id=excluded.budget_id,
                 reserve_units=excluded.reserve_units,approval_scope=excluded.approval_scope,approval_id=excluded.approval_id''',
@@ -214,7 +287,7 @@ class ControlPolicy:
         expiry = _time(expires_at)
         if expiry <= self.store._now(): raise DispatchError('approval already expired')
         proof = self._artifact(evidence_ref)
-        with self.store._tx() as conn:
+        with self._task_tx(task_id) as (conn, _):
             task = self._task(conn,task_id)
             expected = {'task_id':task_id,'fingerprint':task['fingerprint'],'scope':scope,'decision':decision,'actor':actor}
             if any(proof.get(key)!=value for key,value in expected.items()) or _time(proof.get('expires_at')) < expiry:
@@ -230,7 +303,7 @@ class ControlPolicy:
     def mark_uncertain(self, task_id, fence, *, actor):
         _id(actor)
         if type(fence) is not int or fence<1: raise DispatchError('positive attempt fence required')
-        with self.store._tx() as conn:
+        with self._task_tx(task_id) as (conn, _):
             row=conn.execute('SELECT state FROM control_reservations WHERE task_id=? AND fence=?',(task_id,fence)).fetchone()
             if not row:
                 raise DispatchError('attempt has no reservation')
@@ -241,7 +314,7 @@ class ControlPolicy:
         _id(actor); _units(actual_units)
         if type(fence) is not int or fence<1: raise DispatchError('positive attempt fence required')
         proof = self._artifact(evidence_ref)
-        with self.store._tx() as conn:
+        with self._task_tx(task_id) as (conn, _):
             row = conn.execute('SELECT * FROM control_reservations WHERE task_id=? AND fence=?',(task_id,fence)).fetchone()
             if not row: raise DispatchError('attempt has no reservation')
             expected = {'task_id':task_id,'fence':fence,'budget_id':row['budget_id'],
@@ -268,6 +341,7 @@ class ControlPolicy:
         host event. Proofs use that stable raw reference, independent of which
         observer fence produced a summary report.
         """
+        self._require_isolated('settle_host_run')
         _id(actor); _id(run_id)
         wrapper=self._artifact(terminal_event_ref)
         if wrapper.get('schema')!='sa_dispatch.host_terminal.v1' or wrapper.get('task_id')!=task_id or wrapper.get('run_id')!=run_id:
@@ -326,6 +400,7 @@ class ControlPolicy:
 
     def handoff_offer(self, handoff_id, *, from_conv, to_conv, project_id, scope, expires_at,
                       actor, scope_refs=(), authorization_ref=None):
+        self._require_isolated('handoff_offer')
         for value in (handoff_id,from_conv,to_conv,project_id,actor): _id(value)
         if actor!=from_conv or scope not in ('read_status','instruct','takeover'):
             raise DispatchError('handoff sender and scope required')
@@ -352,6 +427,7 @@ class ControlPolicy:
             _event(conn,'handoff:'+row['handoff_id']+':expired','handoff.expired','policy',now,code='authorization_expired')
 
     def handoff_transition(self, handoff_id, state, *, actor, receipt_ref=None):
+        self._require_isolated('handoff_transition')
         _id(actor)
         if state not in ('accepted','completed','rejected'): raise DispatchError('invalid handoff transition')
         proof=self._artifact(receipt_ref) if state=='completed' else None
@@ -381,6 +457,11 @@ class ControlPolicy:
         if type(uncertain_after_hours) is not int or not 0<=uncertain_after_hours<=8760:
             raise DispatchError('uncertainty threshold must be integer hours between 0 and 8760')
         cutoff=timestamp(self.store.clock.now()-timedelta(hours=uncertain_after_hours))
+        with closing(self.store._connect()) as conn:
+            conn.execute('BEGIN')
+            if ledger_mode(conn) == 'mixed':
+                self._require_route_authority()
+                return self._mixed_status(conn, cutoff, uncertain_after_hours)
         with self.store._tx() as conn:
             self._expire(conn)
             result={name:[dict(row) for row in conn.execute('SELECT * FROM control_'+name)]
@@ -390,3 +471,26 @@ class ControlPolicy:
                 SELECT r.*,b.unit,b.period FROM control_reservations r JOIN control_budgets b USING(budget_id)
                 WHERE r.state='uncertain' AND r.uncertain_at<? ORDER BY r.uncertain_at,r.task_id,r.fence''',(cutoff,))]
             return result
+
+    def _mixed_status(self, conn, cutoff, uncertain_after_hours):
+        route = self.store.route
+        owned = ("SELECT task_id FROM tasks WHERE execution_route=? "
+                 "AND access='synthetic' AND egress='none'")
+        result = {
+            name: [dict(row) for row in conn.execute(
+                f'SELECT * FROM control_{name} WHERE task_id IN ({owned})', (route,))]
+            for name in ('task_rules', 'approvals', 'reservations', 'events')
+        }
+        result['budgets'] = [dict(row) for row in conn.execute(f'''
+            SELECT * FROM control_budgets WHERE budget_id IN (
+                SELECT budget_id FROM control_task_rules WHERE task_id IN ({owned})
+                UNION
+                SELECT budget_id FROM control_reservations WHERE task_id IN ({owned}))''',
+            (route, route))]
+        result['uncertain_over_threshold'] = [dict(row) for row in conn.execute(f'''
+            SELECT r.*,b.unit,b.period FROM control_reservations r JOIN control_budgets b USING(budget_id)
+            WHERE r.task_id IN ({owned}) AND r.state='uncertain' AND r.uncertain_at<?
+            ORDER BY r.uncertain_at,r.task_id,r.fence''', (route, cutoff))]
+        result.update(scope='route_task', execution_route=route, budget_totals_scope='ledger',
+                      handoffs=[], uncertain_after_hours=uncertain_after_hours)
+        return result

@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "9fd9b8abb00b72d3106b4c4ea9340d97c58f7c2e1b74b1c4b7a2bbe04dc79bfb"
+    "staged_sha256": "d23db867b919c6b01931ab971cbc9482665d7b2bc0172f025eb199d8823ba067"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "1e273f8e7e847764de48bdc6477a6cbbf02a893d65705d85388eef5bd5efd368"
+    "staged_sha256": "701ff51723b8e789654ea4914c133ae662dfc540cf4c1616e9ecd771592ee152"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "7ecff6e8e21e6cc1d35376ee54e7a0d7e2151ded4f85b4294cbdcf56bc6ebe6b"
+    "staged_sha256": "81f8330e72d511e224bd7cc5e43575cb401203065573fad71911e307da14afad"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "998ea2eb43aa6e4e13284eea872130d4d14d6aca7cd718d0fb30c66affa27f20"
+    "staged_sha256": "ed72b0fd94350703a2f402665af5a6ddedfd553999ed7259c1c906b0647220fa"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -146,13 +146,13 @@
   },
   "dispatch/sa_dispatch/control_cli.py": {
     "source": "dispatch/sa_dispatch/control_cli.py",
-    "source_sha256": "ad1b8f35be289bcfd0ad2c471e01804bd53f66bd9b507d73dbc4806ac42d66ca",
-    "staged_sha256": "ad1b8f35be289bcfd0ad2c471e01804bd53f66bd9b507d73dbc4806ac42d66ca"
+    "source_sha256": "1264b49061e808930d708ba10381420ddcf339a98ab2a518802400287e03a754",
+    "staged_sha256": "1264b49061e808930d708ba10381420ddcf339a98ab2a518802400287e03a754"
   },
   "dispatch/sa_dispatch/control_policy.py": {
     "source": "dispatch/sa_dispatch/control_policy.py",
-    "source_sha256": "776ce671bff2f2dd096440bcbac20a86715482fd1cd27a634015535fa99d0f96",
-    "staged_sha256": "776ce671bff2f2dd096440bcbac20a86715482fd1cd27a634015535fa99d0f96"
+    "source_sha256": "6983a3ad8e949504274c67e41f495a039df0853e086359f9e3f5b234180bac36",
+    "staged_sha256": "6983a3ad8e949504274c67e41f495a039df0853e086359f9e3f5b234180bac36"
   },
   "dispatch/sa_dispatch/executor.py": {
     "source": "dispatch/sa_dispatch/executor.py",
@@ -829,10 +829,15 @@
     "source_sha256": "db0fb20896eeca7f528c6811e1163ee1c222c55d1b3037377a4fce73cefbb250",
     "staged_sha256": "db0fb20896eeca7f528c6811e1163ee1c222c55d1b3037377a4fce73cefbb250"
   },
+  "dispatch/tests/test_mixed_control_policy.py": {
+    "source": "dispatch/tests/test_mixed_control_policy.py",
+    "source_sha256": "b6f779d35329f10109382688e4791374a85fc46a40717680d407483011b6e8d7",
+    "staged_sha256": "b6f779d35329f10109382688e4791374a85fc46a40717680d407483011b6e8d7"
+  },
   "dispatch/tests/test_mixed_research_cli.py": {
     "source": "dispatch/tests/test_mixed_research_cli.py",
-    "source_sha256": "b4061e3d99e235b8e51d274108d413c73fdad098f6e4e1d85e1b20e963d15ba6",
-    "staged_sha256": "b4061e3d99e235b8e51d274108d413c73fdad098f6e4e1d85e1b20e963d15ba6"
+    "source_sha256": "c8e550620563073dc814f02e2b62905390a69870b5966b1460e537bd6b79f151",
+    "staged_sha256": "c8e550620563073dc814f02e2b62905390a69870b5966b1460e537bd6b79f151"
   },
   "dispatch/tests/test_mixed_route_core.py": {
     "source": "dispatch/tests/test_mixed_route_core.py",

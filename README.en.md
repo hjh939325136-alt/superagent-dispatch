@@ -39,6 +39,8 @@ After the content workflow runs, open `report.json` in its output directory to s
 
 A single task ledger can now serve both local commands and a loopback HTTP coordinator, with each side claiming its own tasks. Mixed mode requires explicit activation by an operator. The regular examples still run in isolated mode. The [preview guide](M0_PREVIEW.en.md#isolated-and-mixed-execution) lists the remaining limits.
 
+Mixed mode can now bind approval and budget rules to individual tasks and settle their synthetic usage against evidence. A task with an uncertain business outcome stays pending review after its usage is settled, with no automatic retry.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

@@ -32,7 +32,9 @@ Collector `sync` and `adopt`, including calls through `manager sync` and `manage
 
 Ledger schema `0012` adds optional mixed mode, and the export format moves to `bundle.v7`. In mixed mode, local research and content commands and a loopback HTTP coordinator can use one ledger while claiming their own routed tasks. Manager can query compatible synthetic `0012` ledgers read-only. Activation is an explicit maintenance action that checks evidence against the ledger's current state. The regular examples remain in isolated mode.
 
-Approval administration, budget settlement, and final settlement of uncertain results are still unavailable in mixed mode. In the verified example, an uncertain task is held for review without an automatic retry. Domain recovery, migration of real data, and switching the running service still require separate validation. This update publishes development preview source, and the running service has yet to adopt it.
+Mixed mode supports binding rules and recording approvals for individual tasks on the caller's route, reserving uncertain usage, and settling final usage against evidence. Existing task constraints cannot be weakened. Approvals stay with their original task and settlement stays within a route. Status is read-only, shows tasks for the selected route, and labels budget totals as ledger-wide.
+
+Global budget configuration, handoff administration, and automatic host settlement remain unavailable in mixed mode. Settling usage leaves an uncertain business outcome pending and does not replay the write. Final business settlement of uncertain tasks, domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
 
 ## Verify Dispatch
 
