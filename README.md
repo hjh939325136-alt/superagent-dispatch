@@ -53,6 +53,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 ## 当前进度
 
-公开版在 Windows 和隔离 Debian 上跑过本机样例。演示用合成资料和模拟审核。现役服务尚未采用这些更新，完整系统上线、跨设备执行、24 小时连续运行和真实数据库迁移仍待验证。
+公开源码已在 Windows 和隔离 Debian 上跑过本机样例。演示使用合成资料和模拟审核。一套专属合成 Debian 沙盒已实际从 `0011` 升级到 `0012` 隔离模式。升级后核对了原历史任务、未采信迟到审计、统一事件、采集游标和证据对象。混合模式激活、原生研究与内容接线、Collector 逐流显式接续仍待完成。完整 M0 尚未就绪。
+
+交付方向是使用自动安装 U 盘，在现场把系统安装到已核对的新空 SSD。安装镜像和虚拟机验收还待完成，可交付的安装 U 盘尚未就绪。
 
 [预览技术说明](M0_PREVIEW.md) · [中文开发更新](DEVELOPMENT_UPDATES.md)

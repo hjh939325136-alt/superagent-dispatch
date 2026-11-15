@@ -38,7 +38,7 @@ Ledger schema `0012` adds optional mixed mode, and the export format moves to `b
 
 Mixed mode supports binding rules and recording approvals for individual tasks on the caller's route, reserving uncertain usage, and settling final usage against evidence. Existing task constraints cannot be weakened. Approvals stay with their original task and settlement stays within a route. Status is read-only, shows tasks for the selected route, and labels budget totals as ledger-wide.
 
-Shared budgets and synthetic handoffs can be managed through the [central maintenance entry point](dispatch/docs/design/central_control.en.md). A trusted local caller must select it explicitly and supply the expected activation evidence. Status is read-only, and expiry requires an explicit handoff ID. Execution-route permissions stay the same, and automatic host settlement remains unavailable. Usage settlement leaves the business outcome for the evidence review described below. Domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
+Shared budgets and synthetic handoffs can be managed through the [central maintenance entry point](dispatch/docs/design/central_control.en.md). A trusted local caller must select it explicitly and supply the expected activation evidence. Status is read-only, and expiry requires an explicit handoff ID. Execution-route permissions stay the same, and automatic host settlement remains unavailable. Usage settlement leaves the business outcome for the evidence review described below. Switching the running service to mixed mode and migrating real data still require validation.
 
 ## Historical reconciliation and tool compatibility
 
@@ -46,7 +46,7 @@ Before executing a mixed-mode local task, the system records the original reques
 
 **Use `0.1.1-m0.6` or a later compatible implementation for export, verify, and import.** `0.1.1-m0.5` and earlier v7 tools can omit supporting evidence and still report their own incomplete export as valid. The new verifier rejects missing or mismatched evidence. The v7 label describes the bundle format. Compatibility depends on the tool version. Stop old writers before using the new ledger. Keep writer versions separate and avoid in-place downgrades. The maintenance procedure enforces this boundary since the runtime has yet to enforce a minimum version automatically.
 
-Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. The original workflow binding digest includes absolute locations. Offline recovery maps new locations separately and preserves the original bindings and task identities. Central maintenance has been tested locally with synthetic data. Cross-machine management and upgrades to the running service still require validation.
+Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. The original workflow binding digest includes absolute locations. Offline recovery maps new locations separately and preserves the original bindings and task identities. Central maintenance has been tested locally with synthetic data. Cross-machine management and switching the running service to mixed mode still require validation.
 
 ## Offline synthetic domain recovery
 
@@ -74,4 +74,12 @@ python -B -m sa_dispatch selftest
 
 The checks use Python and synthetic data, including fixtures for older task records. The [earlier compatibility notes](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/M0_PREVIEW.md#reproduce-the-dispatcher-checks) describe the fixture coverage. Linux templates live under [dispatch/deploy](dispatch/deploy/README.md).
 
-This public source preview was tested with local examples on Windows and isolated Debian. Production rollout, server installation, continuous operation, cross-device execution, and migration of real databases require separate validation. The running service has yet to adopt these updates. See [MIT license](LICENSE), `SHA256SUMS` for file checksums, and `SOURCE_PROVENANCE.json` for file origins.
+This public source preview was tested with local synthetic examples on Windows and isolated Debian.
+
+## Sandbox and delivery progress
+
+A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
+
+The delivery plan is to use an automated installation USB drive on-site with a verified new blank SSD. The installation image and virtual-machine validation are still pending, so the USB drive is not ready for delivery.
+
+Continuous operation, cross-device execution, and migration of real databases still require separate validation. See [MIT license](LICENSE), `SHA256SUMS` for file checksums, and `SOURCE_PROVENANCE.json` for file origins.

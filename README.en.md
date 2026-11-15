@@ -53,6 +53,8 @@ Offline checkpoints can now preserve supported ignored late receipts after an ex
 
 ## Current status
 
-The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.
+The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
+
+The delivery plan is to use an automated installation USB drive on-site with a verified new blank SSD. The installation image and virtual-machine validation are still pending, so the USB drive is not ready for delivery.
 
 [Technical preview guide](M0_PREVIEW.en.md) · [Development updates](DEVELOPMENT_UPDATES.en.md)

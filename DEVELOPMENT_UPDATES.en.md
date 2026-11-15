@@ -80,4 +80,12 @@ Offline checkpoints can preserve two reviewed kinds of ignored late audit. The p
 
 - Original audit rows and evidence objects are preserved as ignored. A late claim cannot establish completion. The rehearsal confirms history through the original invocation’s read-only lookup.
 - Collector freezes the old binding after upgrade. Check backlog and anchors before explicitly adopting each stream. The tests confirm existing projections stay intact and repeat sync adds no duplicates. Collector runtime code stays the same.
-- Ordinary v7 still rejects every late receipt. An older 0011 ledger alone remains insufficient for complete domain recovery. The running service has yet to adopt the update.
+- Ordinary v7 still rejects every late receipt. An older 0011 ledger alone remains insufficient for complete domain recovery. At publication time, the dedicated sandbox had yet to be upgraded.
+
+## 2026-11-16 sandbox and delivery progress
+
+A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
+
+The delivery plan is to use an automated installation USB drive on-site with a verified new blank SSD. The installation image and virtual-machine validation are still pending, so the USB drive is not ready for delivery.
+
+The sandbox uses the already published `0.1.1-m0.10` source.
