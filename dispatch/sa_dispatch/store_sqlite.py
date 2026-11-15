@@ -8,13 +8,16 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
+from .artifacts import ArtifactStore
 from .clock import Clock, timestamp
 from .canonical import canonical_json, sha256_ref
+from .invocation import (INTENT_KIND, WORKFLOW_PROFILE, intent_document, read_intent, read_object,
+                         receipt_bytes, same, validate_approval_row, verify_reconciliation)
 from .models import (DispatchError, DuplicateInflight, Evidence, FenceRejected,
                      IdempotencyConflict, InvalidTransition, Lease, Outcome,
                      Ref, SweepReport, TaskRow, TaskSpec)
 from .states import TERMINAL, validate_transition
-from .routing import HTTP_ROUTE, ROUTES, RouteRejected, audit, ledger_mode
+from .routing import HTTP_ROUTE, LOCAL_ROUTE, ROUTES, RouteRejected, audit, ledger_mode
 
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
@@ -323,9 +326,15 @@ class SqliteStore:
     def _outcome(self,outcome):
         if isinstance(outcome,dict): outcome=Outcome.from_dict(outcome)
         if outcome.status not in ('succeeded','no_new','failed'): raise InvalidTransition('invalid completion status')
+        self._reject_reserved_evidence(outcome)
         return outcome, _json(asdict(outcome))
 
+    def _reject_reserved_evidence(self, outcome):
+        if any(ev.kind == INTENT_KIND for ev in outcome.evidence):
+            raise DispatchError('invocation intent evidence requires a live local lease')
+
     def _record_evidence(self,c,task,outcome):
+        self._reject_reserved_evidence(outcome)
         for ev in outcome.evidence:
             if ev.access not in ('synthetic','exportable','local_only'): raise DispatchError('invalid evidence access')
             if self.route is not None and ev.access != 'synthetic':
@@ -333,6 +342,105 @@ class SqliteStore:
             c.execute('INSERT OR IGNORE INTO evidence VALUES(?,?,?,?,?,?,?,?,?)',
                       ('e_'+uuid4().hex,task['task_id'],task['fence'],ev.kind,_json(asdict(ev.ref)) if ev.ref else None,
                        ev.content_hash,ev.artifact_hash,ev.access,self._now()))
+
+    def _invocation_context(self, c, task, device_id, artifacts):
+        self.require_task_route(task, conn=c)
+        config = self.component_config
+        device = c.execute('SELECT execution_route FROM devices WHERE device_id=?', (device_id,)).fetchone()
+        if (self.route != LOCAL_ROUTE or config is None or config.synthetic is not True
+                or config.execution_route != LOCAL_ROUTE or Path(config.db_path).resolve() != self.path.resolve()
+                or config.device_id != device_id or device is None or device['execution_route'] != LOCAL_ROUTE
+                or task.access != 'synthetic' or task.egress != 'none'
+                or not self._enabled_kind(task.kind, task.kind_version)):
+            raise RouteRejected('invocation requires the configured local synthetic attempt')
+        kind = self.kinds[task.kind]
+        if kind.component not in config.components or task.side_effect != kind.side_effect:
+            raise RouteRejected('invocation requires the exact configured component')
+        same(kind.scope(task.params), task.scope, 'task scope differs from the configured component')
+        trusted = ArtifactStore(config.artifact_root)
+        if not isinstance(artifacts, ArtifactStore) or artifacts.root != trusted.root:
+            raise RouteRejected('invocation evidence requires the configured artifact store')
+        return kind, trusted
+
+    def _intent_row(self, c, task_id, fence):
+        rows = c.execute('SELECT * FROM evidence WHERE task_id=? AND fence=? AND kind=?',
+                         (task_id, fence, INTENT_KIND)).fetchall()
+        if len(rows) > 1:
+            raise DispatchError('duplicate invocation intent for the same attempt')
+        return rows[0] if rows else None
+
+    def _historical_approval(self, c, approval_id):
+        return c.execute('SELECT * FROM control_approvals WHERE approval_id=?', (approval_id,)).fetchone()
+
+    def record_invocation_intent(self, lease_id, fence, device_id, request_ref, artifacts):
+        if type(fence) is not int:
+            raise FenceRejected('integer attempt fence required')
+        with self._tx(execution=True) as c:
+            lease, row, valid = self._active(c, lease_id, fence, device_id)
+            if not valid:
+                raise FenceRejected('lease is not current, owned and unexpired')
+            task = self._task(row)
+            kind, artifacts = self._invocation_context(c, task, device_id, artifacts)
+            request = read_object(artifacts, request_ref)
+            profile = getattr(kind, 'mixed_reconciliation_profile', None)
+            document = intent_document(task, lease, kind.component, profile, request_ref, request)
+            ref = sha256_ref(receipt_bytes(document))
+            prior = self._intent_row(c, task.task_id, fence)
+            if prior is not None:
+                if prior['artifact_hash'] != ref:
+                    raise DispatchError('invocation intent cannot be replaced')
+                read_intent(task, lease, prior, artifacts, approval_row=lambda key: self._historical_approval(c, key))
+                return ref
+            at = self._now()
+            if at >= lease['expires_at']:
+                raise FenceRejected('lease expired while preparing invocation')
+            if profile == WORKFLOW_PROFILE:
+                kind.validate_historical_request(task, request, artifacts)
+                if task.kind == 'content.approval_record':
+                    approval = request['payload']['control_approval']
+                    rule = c.execute('SELECT * FROM control_task_rules WHERE task_id=?', (task.task_id,)).fetchone()
+                    if (rule is None or rule['fingerprint'] != task.fingerprint or
+                            rule['approval_scope'] != approval['scope'] or rule['approval_id'] != approval['approval_id']):
+                        raise DispatchError('control approval changed before invocation')
+                    validate_approval_row(task, request, self._historical_approval(c, approval['approval_id']), at)
+            else:
+                same(request, kind.request(task), 'invocation differs from the registered task request')
+            artifacts.put(receipt_bytes(document))
+            c.execute('INSERT INTO evidence VALUES(?,?,?,?,?,?,?,?,?)',
+                      ('e_'+uuid4().hex, task.task_id, fence, INTENT_KIND, None, ref, ref, 'synthetic', at))
+            return ref
+
+    def _load_unknown_invocation(self, c, row, artifacts):
+        task = self._task(row)
+        config = self.component_config
+        if task.status != 'unknown' or config is None:
+            raise DispatchError('unknown local task required')
+        kind, artifacts = self._invocation_context(c, task, config.device_id, artifacts)
+        if (getattr(kind, 'mixed_reconciliation_profile', None) != WORKFLOW_PROFILE
+                or not all(callable(getattr(kind, hook, None)) for hook in
+                           ('validate_historical_request', 'lookup_request', 'validate_lookup', 'result'))):
+            raise RouteRejected('registered kind does not support mixed historical reconciliation')
+        lease = c.execute('SELECT * FROM leases WHERE task_id=? AND fence=?', (task.task_id, task.fence)).fetchone()
+        anchor = self._intent_row(c, task.task_id, task.fence)
+        if (anchor is None or lease is None or lease['device_id'] != config.device_id
+                or lease['state'] not in ('unknown', 'expired') or lease['completion_json'] is not None
+                or (lease['state'] == 'expired' and lease['expires_at'] > self._now())):
+            raise DispatchError('unknown attempt has no owned invocation intent')
+        intent, original, _ = read_intent(task, lease, anchor, artifacts,
+                                         approval_row=lambda key: self._historical_approval(c, key))
+        if intent['component'] != kind.component or intent['profile'] != WORKFLOW_PROFILE:
+            raise DispatchError('invocation belongs to another component')
+        kind.validate_historical_request(task, original, artifacts)
+        return task, kind, anchor['artifact_hash'], intent, original, artifacts
+
+    def original_invocation(self, task_id, fence, artifacts):
+        with closing(self._connect()) as c:
+            c.execute('BEGIN')
+            row = c.execute('SELECT * FROM tasks WHERE task_id=?', (task_id,)).fetchone()
+            if row is None or type(fence) is not int or row['fence'] != fence:
+                raise FenceRejected('reconciliation belongs to an older attempt')
+            _, _, ref, intent, original, _ = self._load_unknown_invocation(c, row, artifacts)
+            return ref, intent, original
 
     def complete(self,lease_id,fence,outcome,device_id):
         outcome, encoded = self._outcome(outcome)
@@ -457,8 +565,12 @@ class SqliteStore:
             task=c.execute('SELECT * FROM tasks WHERE task_id=?',(task_id,)).fetchone()
             self.require_task_route(task, conn=c)
             if not task or task['status']!='unknown': raise InvalidTransition('task is not unknown')
-            if self.route is not None and verdict != 'still_unknown':
-                raise RouteRejected('mixed reconciliation requires route-aware domain evidence')
+            if self.route is not None and verdict != 'still_unknown' and (
+                    self.route != LOCAL_ROUTE or verdict != 'confirmed_done' or manual is not False
+                    or component is not None or capability is not None):
+                raise RouteRejected('mixed reconciliation only accepts local historical completion evidence')
+            if outcome is not None:
+                outcome,_=self._outcome(outcome)
             if verdict != 'still_unknown' and (type(expected_fence) is not int or artifacts is None):
                 raise DispatchError('state-changing reconciliation requires attempt fence and artifacts')
             if expected_fence is not None and task['fence'] != expected_fence:
@@ -471,23 +583,16 @@ class SqliteStore:
                 self._event(c,task,'unknown','unknown',verdict,actor)
             elif verdict in ('confirmed_done','done'):
                 if outcome is None: raise DispatchError('confirmed result required')
-                outcome,_=self._outcome(outcome)
                 if outcome.status!='succeeded' or not outcome.evidence: raise DispatchError('confirmed completion evidence required')
                 if not evidence_ref:
                     raise DispatchError('bound completion receipt required')
-                receipt = json.loads(artifacts.get(evidence_ref))
-                expected = {'schema': 'sa_dispatch.reconciliation.v1', 'task_id': task_id,
-                            'fence': task['fence'], 'idem_key': task['idem_key'],
-                            'outcome_hash': sha256_ref(_json(asdict(outcome)).encode('utf-8'))}
-                if not isinstance(receipt, dict) or any(receipt.get(key) != value for key,value in expected.items()):
-                    raise DispatchError('completion receipt does not bind to task, attempt and outcome')
-                if manual:
-                    if receipt.get('decision') != 'succeeded':
-                        raise DispatchError('manual receipt requires a succeeded decision')
+                if self.route == LOCAL_ROUTE:
+                    bound, kind, anchor_ref, intent, original, artifacts = self._load_unknown_invocation(c, task, artifacts)
+                    proof = read_object(artifacts, evidence_ref)
+                    verified = verify_reconciliation(bound, anchor_ref, intent, original, proof, artifacts, kind=kind)
+                    same(asdict(verified), asdict(outcome), 'submitted outcome does not match verified lookup')
                 else:
-                    kind = self.kinds.get(task['kind']) if self.kinds else None
-                    if kind is None or kind.version != task['kind_version'] or receipt.get('component') != kind.component:
-                        raise DispatchError('lookup receipt requires the registered task component')
+                    self._verify_isolated_completion(task, outcome, manual, evidence_ref, artifacts)
                 for item in outcome.evidence:
                     artifacts.get(item.artifact_hash or item.content_hash)
                 self._record_evidence(c,task,outcome)
@@ -542,6 +647,21 @@ class SqliteStore:
             c.execute('INSERT INTO reconciliations VALUES(?,?,?,?,?,?,?,?)',
                       ('rec_' + uuid4().hex, task_id, task['fence'], method, result,
                        evidence_ref, actor, self._now()))
+
+    def _verify_isolated_completion(self, task, outcome, manual, evidence_ref, artifacts):
+        receipt = json.loads(artifacts.get(evidence_ref))
+        expected = {'schema': 'sa_dispatch.reconciliation.v1', 'task_id': task['task_id'],
+                    'fence': task['fence'], 'idem_key': task['idem_key'],
+                    'outcome_hash': sha256_ref(receipt_bytes(asdict(outcome)))}
+        if not isinstance(receipt, dict) or any(receipt.get(key) != value for key, value in expected.items()):
+            raise DispatchError('completion receipt does not bind to task, attempt and outcome')
+        if manual:
+            if receipt.get('decision') != 'succeeded':
+                raise DispatchError('manual receipt requires a succeeded decision')
+        else:
+            kind = self.kinds.get(task['kind']) if self.kinds else None
+            if kind is None or kind.version != task['kind_version'] or receipt.get('component') != kind.component:
+                raise DispatchError('lookup receipt requires the registered task component')
 
     def cancel(self,task_id,actor):
         with self._tx(execution=True) as c:

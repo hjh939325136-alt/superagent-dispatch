@@ -34,7 +34,15 @@ Ledger schema `0012` adds optional mixed mode, and the export format moves to `b
 
 Mixed mode supports binding rules and recording approvals for individual tasks on the caller's route, reserving uncertain usage, and settling final usage against evidence. Existing task constraints cannot be weakened. Approvals stay with their original task and settlement stays within a route. Status is read-only, shows tasks for the selected route, and labels budget totals as ledger-wide.
 
-Global budget configuration, handoff administration, and automatic host settlement remain unavailable in mixed mode. Settling usage leaves an uncertain business outcome pending and does not replay the write. Final business settlement of uncertain tasks, domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
+Global budget configuration, handoff administration, and automatic host settlement remain unavailable in mixed mode. Usage settlement leaves the business outcome for the evidence review described below. Domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
+
+## Historical reconciliation and tool compatibility
+
+Before executing a mixed-mode local task, the system records the original request under a valid lease. For an uncertain `research_content.v1` write, a read-only lookup checks the original request, historical approval, component instance, and recorded result. Complete evidence can confirm historical completion even if the original journal is unavailable. Later denial, expiry, or source withdrawal still applies. Historical confirmation leaves current availability unchanged. HTTP and manual settlement, declaring a write incomplete, and replay remain disabled. Tasks from unsupported components or without an original record stay pending review.
+
+**Use `0.1.1-m0.6` or a later compatible implementation for export, verify, and import.** `0.1.1-m0.5` and earlier v7 tools can omit supporting evidence and still report their own incomplete export as valid. The new verifier rejects missing or mismatched evidence. The v7 label describes the bundle format. Compatibility depends on the tool version. Stop old writers before using the new ledger. Keep writer versions separate and avoid in-place downgrades. The maintenance procedure enforces this boundary since the runtime has yet to enforce a minimum version automatically.
+
+Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. Workflow binding digests include absolute locations. Cross-machine rebinding, central control, and upgrades to the running service still require validation.
 
 ## Verify Dispatch
 

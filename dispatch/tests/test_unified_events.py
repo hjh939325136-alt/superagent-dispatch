@@ -1,3 +1,4 @@
+from contextlib import closing
 import json
 import sqlite3
 import tempfile
@@ -77,7 +78,7 @@ class UnifiedEventsTests(unittest.TestCase):
         self.assertNotIn(task2.task_id,self.events.diagnostics()['succeeded_without_output_refs'])
 
     def test_schema_initialization_does_not_commit_caller_transaction(self):
-        with sqlite3.connect(':memory:') as conn:
+        with closing(sqlite3.connect(':memory:')) as conn, conn:
             conn.execute('BEGIN')
             initialize_schema(conn)
             conn.rollback()

@@ -13,9 +13,9 @@ import tempfile
 
 from .artifacts import ArtifactError, ArtifactStore
 from .canonical import sha256_ref
-from .executor import receipt_bytes
-from .models import DispatchError
-from .routing import (ROUTED_TABLES, ROUTES, _digest, ledger_mode, read_route_evidence,
+from .invocation import (INTENT_KIND, read_intent, read_object, receipt_bytes, same, verify_reconciliation)
+from .models import DispatchError, TaskRow
+from .routing import (LOCAL_ROUTE, ROUTED_TABLES, ROUTES, _digest, ledger_mode, read_route_evidence,
                       validate_binding_evidence, validate_mixed_records)
 
 
@@ -191,6 +191,7 @@ def portable(records, *, include_fixed_refs=True):
 
 def _artifact_inventory(records, store, *, legacy=False):
     hashes = set(portable(records,include_fixed_refs=not legacy))
+    hashes.update(_invocation_inventory(records, store))
     for row in records.get('route_audit', []):
         ref = row['evidence_ref']
         if ref is None:
@@ -275,6 +276,84 @@ def _artifact_inventory(records, store, *, legacy=False):
                         raise ArtifactError('E_BUNDLE_INVALID','Claude terminal child reference required')
                     store.get(linked);hashes.add(linked)
     return sorted(hashes)
+
+
+def _invocation_inventory(records, artifacts):
+    """Follow only the dispatcher-owned intent/lookup fields and fixed workflow approval proof."""
+    tasks = {row['task_id']: row for row in records['tasks']}
+    leases = {}
+    for row in records['leases']:
+        leases.setdefault((row['task_id'], row['fence']), []).append(row)
+    approvals = {row['approval_id']: row for row in records.get('control_approvals', [])}
+    evidence = {}
+    anchors = {}
+    hashes = set()
+    for row in records['evidence']:
+        key = (row['task_id'], row['fence'])
+        evidence.setdefault(key, []).append(row)
+        if row['kind'] != INTENT_KIND:
+            continue
+        if key in anchors or len(leases.get(key, ())) != 1:
+            raise DispatchError('invocation must identify a unique anchor and lease')
+        task = _invocation_task(tasks[key[0]])
+        intent, original, approval_ref = read_intent(task, leases[key][0], row, artifacts,
+                                                   approval_row=approvals.get)
+        anchors[key] = (row['artifact_hash'], intent, original)
+        hashes.update((row['artifact_hash'], intent['request_ref']))
+        if approval_ref is not None:
+            hashes.add(approval_ref)
+
+    historical_fences = {row['object_id']: row['fence'] for row in records.get('route_audit', [])
+                         if row['action'] == 'bind' and row['object_table'] == 'tasks'}
+    reconciled = set()
+    for row in records.get('reconciliations', []):
+        key = (row['task_id'], row['epoch'])
+        raw_task = tasks[key[0]]
+        routed = raw_task.get('execution_route') == LOCAL_ROUTE
+        if not routed or row['result'] != 'found':
+            continue
+        if key not in anchors and historical_fences.get(key[0], -1) >= key[1]:
+            continue  # Existing isolated reconciliation can predate explicit route binding.
+        if key in reconciled or key not in anchors or row['method'] != 'lookup':
+            raise DispatchError('mixed reconciliation requires one owned invocation anchor')
+        lease = leases[key][0]
+        task = _invocation_task(raw_task)
+        if (task.status != 'succeeded' or type(row['epoch']) is not int or row['epoch'] != task.fence
+                or lease['state'] not in ('unknown', 'expired') or lease['completion_json'] is not None):
+            raise DispatchError('mixed reconciliation does not settle the anchored unknown attempt')
+        ref = row['evidence_ref']
+        proof = read_object(artifacts, ref)
+        anchor_ref, intent, original = anchors[key]
+        outcome = verify_reconciliation(task, anchor_ref, intent, original, proof, artifacts)
+        same(outcome.result, json.loads(raw_task['result_json']), 'mixed task result differs from lookup')
+        for kind, expected_ref in (('reconciliation_receipt', ref),
+                                   ('component_response', proof['lookup_ref'])):
+            matches = [item for item in evidence[key] if item['kind'] == kind]
+            if (len(matches) != 1 or matches[0]['content_hash'] != expected_ref
+                    or matches[0]['artifact_hash'] != expected_ref or matches[0]['ref_json'] is not None
+                    or matches[0]['access'] != 'synthetic'):
+                raise DispatchError('mixed reconciliation evidence rows disagree with lookup')
+        hashes.update((ref, proof['lookup_request_ref'], proof['lookup_ref']))
+        reconciled.add(key)
+
+    for key, rows in evidence.items():
+        if (tasks[key[0]].get('execution_route') == LOCAL_ROUTE and key not in reconciled
+                and historical_fences.get(key[0], -1) < key[1]
+                and any(row['kind'] == 'reconciliation_receipt' for row in rows)):
+            raise DispatchError('unreferenced mixed reconciliation evidence')
+    for task in tasks.values():
+        key = (task['task_id'], task['fence'])
+        if (task.get('execution_route') == LOCAL_ROUTE and task['status'] == 'succeeded'
+                and any(row['state'] in ('unknown', 'expired') for row in leases.get(key, ()))
+                and historical_fences.get(key[0], -1) < key[1] and key not in reconciled):
+            raise DispatchError('mixed successful unknown attempt lacks reconciliation evidence')
+    return hashes
+
+
+def _invocation_task(row):
+    return TaskRow({**row, 'scope': json.loads(row['scope_json']), 'params': json.loads(row['params_json']),
+                    'input_refs': json.loads(row['input_refs_json']),
+                    'required_caps': json.loads(row['required_caps_json'])})
 
 
 def _normalize_snapshot(records):

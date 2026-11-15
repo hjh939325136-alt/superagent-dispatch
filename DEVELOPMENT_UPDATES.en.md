@@ -41,3 +41,11 @@ Mixed mode can record per-task approvals and settle each task’s usage against 
 - Approvals stay with their original task, new rules cannot weaken existing constraints, and usage settlement stays within the route. Read-only status shows tasks by route and labels shared totals as ledger-wide.
 - Settling usage leaves an uncertain business outcome pending review, with no automatic replay of the write.
 - Global budget configuration, handoff administration, and automatic host settlement remain unavailable. The existing demos stay in isolated mode. The running service has yet to adopt the update.
+
+## 0.1.1-m0.6 (2026-11-15)
+
+The local mixed workflow can now confirm the historical result of an uncertain write through read-only lookup when evidence is complete.
+
+- Supported research-to-content writes record the original request before invocation. Historical approval and component results can be checked without the original journal. Later withdrawal or denial still applies, and the lookup never replays the write.
+- Use 0.1.1-m0.6 or a later compatible implementation to export, verify, and import these bundles. Earlier v7 tools can omit supporting evidence and still report a pass. Stop old writers, keep writer versions separate, and avoid in-place downgrades.
+- Validation covers trusted local synthetic workflows. Cross-machine rebinding, central control, and upgrades to the running service still need validation.

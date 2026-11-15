@@ -39,7 +39,9 @@ After the content workflow runs, open `report.json` in its output directory to s
 
 A single task ledger can now serve both local commands and a loopback HTTP coordinator, with each side claiming its own tasks. Mixed mode requires explicit activation by an operator. The regular examples still run in isolated mode. The [preview guide](M0_PREVIEW.en.md#isolated-and-mixed-execution) lists the remaining limits.
 
-Mixed mode can now bind approval and budget rules to individual tasks and settle their synthetic usage against evidence. A task with an uncertain business outcome stays pending review after its usage is settled, with no automatic retry.
+Mixed mode can bind approvals and settle synthetic usage per task. For a supported local research-to-content write with complete evidence, this version can also confirm the historical result through a read-only lookup. It leaves withdrawn material and approvals unavailable and performs no automatic retry.
+
+**Use `0.1.1-m0.6` or a later compatible build for export, verification, and import of these evidence bundles.** Earlier v7 tools can omit supporting evidence. See [historical reconciliation and tool compatibility](M0_PREVIEW.en.md#historical-reconciliation-and-tool-compatibility).
 
 ## Current status
 

@@ -10,12 +10,10 @@ from contextlib import closing
 
 from .artifacts import ArtifactStore
 from .canonical import sha256_ref
+from .invocation import (lookup_document, read_object, receipt_bytes, reconciliation_document, same,
+                         validate_lookup, workflow_outcome)
 from .models import DispatchError, Evidence, FenceRejected, Outcome
-
-
-def receipt_bytes(response):
-    return json.dumps(response, ensure_ascii=False, allow_nan=False, sort_keys=True,
-                      separators=(",", ":")).encode("utf-8")
+from .routing import LOCAL_ROUTE
 
 
 class Executor:
@@ -54,6 +52,16 @@ class Executor:
                    and (lease is None or row.fence == lease.fence
                         and row.device_id == lease.device_id)
                    for row in attempts)
+
+    def _require_mixed_config(self):
+        config = self.store.component_config
+        if self.config != config or getattr(self.runner, 'config', self.config) != config:
+            raise DispatchError('local executor and runner require the store configuration')
+
+    def _require_mixed_component(self, kind, intent):
+        if (kind.component != intent['component'] or kind.version != intent['kind_version']
+                or not getattr(kind, 'enabled', False) or getattr(kind, 'dedicated_runner', False)):
+            raise DispatchError('local executor component differs from the anchored attempt')
 
     def log(self, lease, phase, **data):
         path = self.journal_path(lease)
@@ -95,6 +103,9 @@ class Executor:
         return hook(task, {'task_fingerprint': task.fingerprint, 'control_approval': approval})
 
     def _original_request(self, task):
+        if self.store.route == LOCAL_ROUTE:
+            _, _, original = self.store.original_invocation(task.task_id, task.fence, self.artifacts)
+            return original
         if not callable(getattr(self.kinds[task.spec.kind], 'request_with_context', None)):
             return self.kinds[task.spec.kind].request(task)
         references = set()
@@ -116,6 +127,8 @@ class Executor:
     def run_once(self):
         if self.store.route not in (None, 'local_synthetic'):
             raise DispatchError('local executor cannot run an HTTP route task')
+        if self.store.route == LOCAL_ROUTE:
+            self._require_mixed_config()
         self.store.sweep()
         runnable={name for name,kind in self.kinds.items() if not getattr(kind,'dedicated_runner',False)}
         lease = self.store.claim(self.config.device_id,kinds=runnable)
@@ -130,11 +143,20 @@ class Executor:
         kind = self.kinds[task.spec.kind]
         try:
             request = self._request(task)
-            request_ref = self.artifacts.put(receipt_bytes(request)) if callable(getattr(kind, 'request_with_context', None)) else None
+            request_ref = None
+            if self.store.route == LOCAL_ROUTE or callable(getattr(kind, 'request_with_context', None)):
+                request_ref = self.artifacts.put(receipt_bytes(request))
+            if self.store.route == LOCAL_ROUTE:
+                intent_ref = self.store.record_invocation_intent(lease.lease_id, lease.fence, lease.device_id,
+                                                                 request_ref, self.artifacts)
+                self._require_mixed_component(kind, read_object(self.artifacts, intent_ref))
             self.log(lease, "intent", write_key=request["idempotency_key"], request_ref=request_ref)
         except (ValueError, KeyError, TypeError, OSError, RuntimeError, DispatchError) as exc:
-            self.store.complete(lease.lease_id, lease.fence,
-                Outcome('failed', {'code':getattr(exc,'code','E_REQUEST_REJECTED'),'phase':'pre_invocation'}), lease.device_id)
+            try:
+                self.store.complete(lease.lease_id, lease.fence,
+                    Outcome('failed', {'code':getattr(exc,'code','E_REQUEST_REJECTED'),'phase':'pre_invocation'}), lease.device_id)
+            except FenceRejected:
+                self.store.sweep()
             return self.store.get_task(task.task_id)
         try:
             self.log(lease, "invoked")
@@ -269,11 +291,38 @@ class Executor:
         except (ValueError, KeyError, TypeError, OSError, RuntimeError, DispatchError):
             return {'verdict': 'still_unknown'}
 
+    def _reconcile_mixed(self, task, kind):
+        try:
+            self._require_mixed_config()
+            anchor_ref, intent, original = self.store.original_invocation(task.task_id, task.fence, self.artifacts)
+            self._require_mixed_component(kind, intent)
+            request = kind.lookup_request(task, original, intent['request_ref'])
+            same(request, lookup_document(task, intent), 'invalid read-only lookup request')
+            request_ref = self.artifacts.put(receipt_bytes(request))
+            run = self.runner.run_component(kind.component, request)
+            if run.exit != 0:
+                raise DispatchError('lookup did not succeed')
+            data, response = validate_lookup(task, intent, original, request, run.json)
+            if kind.validate_lookup(task, original, data) is not True:
+                raise DispatchError('kind rejected lookup evidence')
+            lookup_ref = self.artifacts.put(receipt_bytes(run.json))
+            outcome = workflow_outcome(task, response, lookup_ref, kind=kind)
+            proof = self.artifacts.put(receipt_bytes(reconciliation_document(
+                anchor_ref, intent, request_ref, lookup_ref, data['current_usable'], outcome)))
+            self.store.resolve_unknown(task.task_id, 'confirmed_done', 'fixture-reconciliation', outcome=outcome,
+                                       evidence_ref=proof, expected_fence=task.fence, artifacts=self.artifacts)
+            return {'verdict': 'confirmed_done', 'task_id': task.task_id,
+                    'current_usable': data['current_usable'], 'historical_commit': True}
+        except (ValueError, KeyError, TypeError, OSError, RuntimeError, DispatchError):
+            return {'verdict': 'still_unknown'}
+
     def reconcile(self, task):
         if (task.status != "unknown" or not self.config.synthetic
                 or not self._owned_attempt(task)):
             return {"verdict": "still_unknown"}
         kind = self.kinds[task.spec.kind]
+        if self.store.route == LOCAL_ROUTE:
+            return self._reconcile_mixed(task, kind)
         try:
             original = self._original_request(task)
         except (ValueError, KeyError, TypeError, OSError, RuntimeError):

@@ -14,16 +14,11 @@ from sa_dispatch.config import load_config
 from sa_dispatch.models import Outcome
 from sa_dispatch.executor import receipt_bytes
 from sa_dispatch.canonical import sha256_ref
+from sa_dispatch.invocation import (WORKFLOW_PARAMS as PARAMS, WORKFLOW_PROFILE, WORKFLOW_WRITES as WRITES,
+                                    same, workflow_request)
 from knowledge.m0_content.workflow_binding import WorkflowError,load_workflow_binding,search_modules,request_base
 
-WRITES={'context.assemble','content.script_from_context','content.approval_record'}
-OPERATIONS=WRITES|{'content.approval_status'}
-PARAMS={
- 'context.assemble':{'caller','domains','scopes','max_class','as_of','refs'},
- 'content.script_from_context':{'trace_id','context_id','manifest_sha256','template_id'},
- 'content.approval_record':{'trace_id','context_id','manifest_sha256','script_ref'},
- 'content.approval_status':{'trace_id','context_id','manifest_sha256','script_ref','approval_ref'},
-}
+OPERATIONS=set(PARAMS)
 
 
 def validate_params(binding,operation,params,*,invocation=False):
@@ -64,6 +59,7 @@ class WorkflowKind:
     component='research_content'
     enabled=True
     allow_no_new=False
+    mixed_reconciliation_profile=WORKFLOW_PROFILE
     def __init__(self,name,binding):
         self.name,self.binding=name,binding
         self.side_effect='idempotent_write' if name in WRITES else 'none'
@@ -108,6 +104,11 @@ class WorkflowKind:
             'task_id':task.task_id,'scope':'script_ready','actor':'synthetic-operator',
             'expires_at':row_expiry.isoformat()}}
         return request
+    def validate_historical_request(self,task,original,artifacts):
+        if self.name!=task.kind:
+            raise WorkflowError('WORKFLOW_KIND_MISMATCH')
+        same(self.scope(task.params),task.scope,'workflow binding differs from the original invocation')
+        workflow_request(task,original,artifacts)
     def result(self,response,task):
         if (response.get('schema_version')!='0.1' or response.get('ok') is not True or
             response.get('request_id')!=task.task_id):
