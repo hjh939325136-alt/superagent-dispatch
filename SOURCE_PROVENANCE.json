@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "ce746b1f129c3321fd7b5c8e1861db00444744652c4e19c018b1ea3d8979609c"
+    "staged_sha256": "63dab4cd2cbcda9a82adf23ab35c1417d60ab7eb32913b4cbdb67cb3c2911ecb"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "de6bf69699276af7ed9fd2d8877c21116847650882fbfced7d8d7b7275d6e3b9"
+    "staged_sha256": "744c47519c2ed4578284821fb3b9fe77504ac9fefe4c2a888344321a898931cc"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "6077f1b94792d84d00841f901f7cd9f60cf79b252677136f550b929b025288ca"
+    "staged_sha256": "bbf9724b0895120281d328c31ec5618afd84456ccb52ffd3428f95ccb7e23792"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "0fb48d00311ae5aad3c1cd8fc6cb410fa51b40b8d74e44e2736291da7dfeef5b"
+    "staged_sha256": "06fd8eaa2b94e0c9550aff96321fe995bfcd38fa7c1645bc4b3825c33a12e160"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -64,6 +64,14 @@
     "source_sha256": "9544e65025b2333aaae771d50d6e4c8d0d0dc6e43fb3c0e5bc955f38b0570503",
     "staged_sha256": "9544e65025b2333aaae771d50d6e4c8d0d0dc6e43fb3c0e5bc955f38b0570503"
   },
+  "dispatch/docs/design/central_control.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "7aa20c22269db6a9c489a021b65bb37f5ba4b314af61f7139c378dcc9a97bdd9"
+  },
+  "dispatch/docs/design/central_control.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "b7fd5b225f0d35feabb419c9be31655206e284771bbaab95b859702f2ef4f4aa"
+  },
   "dispatch/fixtures/synthetic/topic_supply.json": {
     "source": "dispatch/fixtures/synthetic/topic_supply.json",
     "source_sha256": "8d66139d9be9272ecbd9f4f51443d047a7d6f51bb0e8227b594f96db553dcaac",
@@ -98,6 +106,16 @@
     "source": "dispatch/sa_dispatch/canonical.py",
     "source_sha256": "9a0ec6c1f1fec76e3317d1d73f638e82b723b2b6a775974312b84ab12a2572b3",
     "staged_sha256": "9a0ec6c1f1fec76e3317d1d73f638e82b723b2b6a775974312b84ab12a2572b3"
+  },
+  "dispatch/sa_dispatch/central_control.py": {
+    "source": "dispatch/sa_dispatch/central_control.py",
+    "source_sha256": "ac71501f4538d2647861912483c67371b295bdea857be8e010cfbda4df59f61e",
+    "staged_sha256": "ac71501f4538d2647861912483c67371b295bdea857be8e010cfbda4df59f61e"
+  },
+  "dispatch/sa_dispatch/central_control_cli.py": {
+    "source": "dispatch/sa_dispatch/central_control_cli.py",
+    "source_sha256": "18fbae21a77e9aad44b66914f1a7a0fa2eb04cb440e17b06f1f592e28e036f49",
+    "staged_sha256": "18fbae21a77e9aad44b66914f1a7a0fa2eb04cb440e17b06f1f592e28e036f49"
   },
   "dispatch/sa_dispatch/claude_adapter.py": {
     "source": "dispatch/sa_dispatch/claude_adapter.py",
@@ -151,8 +169,8 @@
   },
   "dispatch/sa_dispatch/control_policy.py": {
     "source": "dispatch/sa_dispatch/control_policy.py",
-    "source_sha256": "6983a3ad8e949504274c67e41f495a039df0853e086359f9e3f5b234180bac36",
-    "staged_sha256": "6983a3ad8e949504274c67e41f495a039df0853e086359f9e3f5b234180bac36"
+    "source_sha256": "61eac294df3fa5c98ad1de4d10b1edcc19bd09873dd62c315b86c92ad5d82a0b",
+    "staged_sha256": "61eac294df3fa5c98ad1de4d10b1edcc19bd09873dd62c315b86c92ad5d82a0b"
   },
   "dispatch/sa_dispatch/executor.py": {
     "source": "dispatch/sa_dispatch/executor.py",
@@ -728,6 +746,16 @@
     "source": "dispatch/tests/test_bundle_v5.py",
     "source_sha256": "31002a84d3515ddaa36547ff62d073952f4fc7f5a4f916f4e8a81e905b75476d",
     "staged_sha256": "31002a84d3515ddaa36547ff62d073952f4fc7f5a4f916f4e8a81e905b75476d"
+  },
+  "dispatch/tests/test_central_control.py": {
+    "source": "dispatch/tests/test_central_control.py",
+    "source_sha256": "8a33807ca1d8ad4eaf4ef6f738bf8255d03b6a1b62cead84035d3b224f039c89",
+    "staged_sha256": "8a33807ca1d8ad4eaf4ef6f738bf8255d03b6a1b62cead84035d3b224f039c89"
+  },
+  "dispatch/tests/test_central_control_cli.py": {
+    "source": "dispatch/tests/test_central_control_cli.py",
+    "source_sha256": "1626826430fd9d8c04591e79c34177c1c3fc9415c9bfc68f88fe631e26f34f69",
+    "staged_sha256": "1626826430fd9d8c04591e79c34177c1c3fc9415c9bfc68f88fe631e26f34f69"
   },
   "dispatch/tests/test_claude_adapter.py": {
     "source": "dispatch/tests/test_claude_adapter.py",

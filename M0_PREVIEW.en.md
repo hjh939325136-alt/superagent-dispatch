@@ -34,7 +34,7 @@ Ledger schema `0012` adds optional mixed mode, and the export format moves to `b
 
 Mixed mode supports binding rules and recording approvals for individual tasks on the caller's route, reserving uncertain usage, and settling final usage against evidence. Existing task constraints cannot be weakened. Approvals stay with their original task and settlement stays within a route. Status is read-only, shows tasks for the selected route, and labels budget totals as ledger-wide.
 
-Global budget configuration, handoff administration, and automatic host settlement remain unavailable in mixed mode. Usage settlement leaves the business outcome for the evidence review described below. Domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
+Shared budgets and synthetic handoffs can be managed through the [central maintenance entry point](dispatch/docs/design/central_control.en.md). A trusted local caller must select it explicitly and supply the expected activation evidence. Status is read-only, and expiry requires an explicit handoff ID. Execution-route permissions stay the same, and automatic host settlement remains unavailable. Usage settlement leaves the business outcome for the evidence review described below. Domain recovery, migration of real data, and switching the running service still require validation. This update publishes development preview source, and the running service has yet to adopt it.
 
 ## Historical reconciliation and tool compatibility
 
@@ -42,7 +42,7 @@ Before executing a mixed-mode local task, the system records the original reques
 
 **Use `0.1.1-m0.6` or a later compatible implementation for export, verify, and import.** `0.1.1-m0.5` and earlier v7 tools can omit supporting evidence and still report their own incomplete export as valid. The new verifier rejects missing or mismatched evidence. The v7 label describes the bundle format. Compatibility depends on the tool version. Stop old writers before using the new ledger. Keep writer versions separate and avoid in-place downgrades. The maintenance procedure enforces this boundary since the runtime has yet to enforce a minimum version automatically.
 
-Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. The original workflow binding digest includes absolute locations. Offline recovery maps new locations separately and preserves the original bindings and task identities. Central control and upgrades to the running service still require validation.
+Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. The original workflow binding digest includes absolute locations. Offline recovery maps new locations separately and preserves the original bindings and task identities. Central maintenance has been tested locally with synthetic data. Cross-machine management and upgrades to the running service still require validation.
 
 ## Offline synthetic domain recovery
 

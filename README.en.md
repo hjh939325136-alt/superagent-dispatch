@@ -47,6 +47,8 @@ This preview can also restore an owned, stopped synthetic workspace to a new dir
 
 Offline recovery also preserves settled scheduling history. Restored schedules and slots can be inspected read-only. An old enabled flag remains historical, and the recovery tools do not run overdue slots.
 
+A separate central maintenance entry point can configure shared budgets, record handoffs, and inspect status on an activated local synthetic mixed ledger. Task claims, approvals, and final settlement stay with their execution routes. See the [central maintenance guide](dispatch/docs/design/central_control.en.md).
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

@@ -65,3 +65,11 @@ Offline recovery now preserves settled scheduling history and evidence reference
 - Read-only schedule-status shows the original enabled flags, versions, slots, and task records. The demo captures three completed synthetic slots. Recovery refuses scheduling commands even after a fourth slot becomes due.
 - Support covers settled standard read-only hotspot.topic_fetch@1 plans on the complete current schema. Legitimate retry diagnostics and deduplicated event summaries are preserved. The summaries have limited evidence about individual slots.
 - Use 0.1.1-m0.8 or a later compatible tool for domain checkpoints with schedule history. Ordinary v7 eligibility is unchanged. Pending reservations, custom kinds, and restarting production schedules remain unsupported.
+
+## 0.1.1-m0.9 (2026-11-15)
+
+Activated local synthetic mixed ledgers now have a dedicated central maintenance entry point for shared budgets and handoffs.
+
+- Trusted local callers explicitly select central maintenance and supply the expected activation evidence. Both routes continue to share the ledger budget. A limit update preserves spent and held usage.
+- Status is read-only. Explicit expiry affects just the named handoff. A due legacy record can expire without granting authority to accept or complete it.
+- Authorization, receipts, and outputs stay bound to their original handoff. Completed handoffs passed export, verification, and restore tests. This entry point runs no tasks and sends no messages.

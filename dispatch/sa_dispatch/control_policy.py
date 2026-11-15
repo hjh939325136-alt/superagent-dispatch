@@ -85,9 +85,73 @@ def _hash(value):
     return value
 
 
-def _event(conn, key, kind, actor, at, *, task_id=None, fence=None, refs=(), code='observed'):
-    conn.execute('''INSERT OR IGNORE INTO control_events(event_id,event_key,kind,task_id,fence,actor,at,refs_json,detail_code)
+def _event(conn, key, kind, actor, at, *, task_id=None, fence=None, refs=(), code='observed', required=False):
+    inserted = conn.execute('''INSERT OR IGNORE INTO control_events(event_id,event_key,kind,task_id,fence,actor,at,refs_json,detail_code)
         VALUES(?,?,?,?,?,?,?,?,?)''', (_ulid(at),key,kind,task_id,fence,actor,at,json.dumps(list(refs)),code))
+    if required and inserted.rowcount != 1:
+        raise DispatchError('handoff event was not recorded')
+
+
+def validate_mixed_control_schema(conn):
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    required = {
+        'tasks': 'task_id execution_route access egress fingerprint status attempts',
+        'control_budgets': 'budget_id period unit limit_units reserved_units used_units starts_at ends_at',
+        'control_task_rules': 'task_id fingerprint budget_id reserve_units approval_scope approval_id',
+        'control_approvals': 'approval_id task_id fingerprint scope decision actor evidence_ref expires_at at',
+        'control_reservations': 'task_id fence budget_id fingerprint reserved_units actual_units state '
+                                'evidence_ref created_at settled_at uncertain_at',
+        'control_handoffs': 'handoff_id from_conv to_conv project_id scope scope_refs_json authorized_by '
+                            'authorization_ref expires_at state receipt_ref evidence_refs_json created_at updated_at',
+        'control_events': 'seq event_id event_key kind task_id fence actor at refs_json detail_code',
+    }
+    for table, columns in required.items():
+        present = {row[1] for row in conn.execute(f'PRAGMA table_info({table})')}
+        if table not in tables or not set(columns.split()) <= present:
+            raise RouteRejected('mixed control policy requires an initialized control schema')
+
+
+def _budget_config(budget_id, *, period, unit, limit_units, starts_at, ends_at):
+    for value in (budget_id, period, unit):
+        _id(value)
+    _units(limit_units)
+    start, end = _time(starts_at), _time(ends_at)
+    if end <= start:
+        raise DispatchError('budget period must be positive')
+    return dict(budget_id=budget_id, period=period, unit=unit, limit_units=limit_units, starts_at=start, ends_at=end)
+
+
+def _write_budget(conn, config, old):
+    if old and any(old[key] != config[key] for key in ('period', 'unit', 'starts_at', 'ends_at')):
+        raise DispatchError('budget period identity is immutable; use a new budget id')
+    if old and old['used_units'] + old['reserved_units'] > config['limit_units']:
+        raise DispatchError('limit cannot erase already used or held units')
+    return conn.execute('''INSERT INTO control_budgets VALUES(:budget_id,:period,:unit,:limit_units,0,0,:starts_at,:ends_at)
+        ON CONFLICT(budget_id) DO UPDATE SET limit_units=excluded.limit_units''', config).rowcount
+
+
+def _insert_handoff(conn, handoff_id, *, from_conv, to_conv, project_id, scope, scope_refs,
+                    authorized_by, authorization_ref, expires_at, at, event_required=False):
+    inserted = conn.execute("""INSERT INTO control_handoffs VALUES(?,?,?,?,?,?,?,?,?,'offered',NULL,'[]',?,?)""",
+        (handoff_id, from_conv, to_conv, project_id, scope, json.dumps(list(scope_refs)), authorized_by,
+         authorization_ref, expires_at, at, at))
+    if event_required and inserted.rowcount != 1:
+        raise DispatchError('handoff offer was not recorded')
+    _event(conn, 'handoff:'+handoff_id+':offered', 'handoff.offered', from_conv, at,
+           refs=(authorization_ref,) if authorization_ref else (), required=event_required)
+
+
+def _write_handoff_state(conn, handoff_id, state, actor, at, *, receipt_ref=None, refs=(), event_required=False):
+    if state == 'expired':
+        changed = conn.execute("UPDATE control_handoffs SET state='expired',updated_at=? WHERE handoff_id=?", (at, handoff_id))
+    else:
+        changed = conn.execute('UPDATE control_handoffs SET state=?,receipt_ref=?,evidence_refs_json=?,updated_at=? WHERE handoff_id=?',
+                               (state, receipt_ref, json.dumps(list(refs)), at, handoff_id))
+    if event_required and changed.rowcount != 1:
+        raise DispatchError('handoff transition was not recorded')
+    _event(conn, 'handoff:'+handoff_id+':'+state, 'handoff.'+state, actor, at,
+           refs=(receipt_ref,) if receipt_ref else (), required=event_required,
+           code='authorization_expired' if state == 'expired' else 'observed')
 
 
 def expire_reservation(conn,task_id,fence,actor,at):
@@ -170,7 +234,7 @@ class ControlPolicy:
             conn.execute('BEGIN')
             if ledger_mode(conn) == 'mixed':
                 self._require_route_authority()
-                self._validate_mixed_schema(conn)
+                validate_mixed_control_schema(conn)
                 return
         with store._tx() as conn:
             initialize_schema(conn)
@@ -178,25 +242,6 @@ class ControlPolicy:
     def _require_route_authority(self):
         if self._authority != 'route_task' or self.store.route not in ROUTES:
             raise RouteRejected('mixed control policy requires explicit route_task authority and a bound route')
-
-    @staticmethod
-    def _validate_mixed_schema(conn):
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        required = {
-            'tasks': 'task_id execution_route access egress fingerprint status attempts',
-            'control_budgets': 'budget_id period unit limit_units reserved_units used_units starts_at ends_at',
-            'control_task_rules': 'task_id fingerprint budget_id reserve_units approval_scope approval_id',
-            'control_approvals': 'approval_id task_id fingerprint scope decision actor evidence_ref expires_at at',
-            'control_reservations': 'task_id fence budget_id fingerprint reserved_units actual_units state '
-                                    'evidence_ref created_at settled_at uncertain_at',
-            'control_handoffs': 'handoff_id from_conv to_conv project_id scope scope_refs_json authorized_by '
-                                'authorization_ref expires_at state receipt_ref evidence_refs_json created_at updated_at',
-            'control_events': 'seq event_id event_key kind task_id fence actor at refs_json detail_code',
-        }
-        for table, columns in required.items():
-            present = {row[1] for row in conn.execute(f'PRAGMA table_info({table})')}
-            if table not in tables or not set(columns.split()) <= present:
-                raise RouteRejected('mixed control policy requires an initialized control schema')
 
     def _require_isolated(self, operation):
         if self.store.routing_mode() == 'mixed':
@@ -234,19 +279,11 @@ class ControlPolicy:
 
     def budget_upsert(self, budget_id, *, period, unit, limit_units, starts_at, ends_at):
         self._require_isolated('budget_upsert')
-        for value in (budget_id,period,unit): _id(value)
-        _units(limit_units)
-        start,end = _time(starts_at),_time(ends_at)
-        if end <= start: raise DispatchError('budget period must be positive')
+        config = _budget_config(budget_id, period=period, unit=unit, limit_units=limit_units,
+                                starts_at=starts_at, ends_at=ends_at)
         with self.store._tx() as conn:
             old = conn.execute('SELECT * FROM control_budgets WHERE budget_id=?',(budget_id,)).fetchone()
-            if old and (old['period'],old['unit'],old['starts_at'],old['ends_at']) != (period,unit,start,end):
-                raise DispatchError('budget period identity is immutable; use a new budget id')
-            if old and old['used_units']+old['reserved_units'] > limit_units:
-                raise DispatchError('limit cannot erase already used or held units')
-            conn.execute('''INSERT INTO control_budgets VALUES(?,?,?,?,0,0,?,?)
-                ON CONFLICT(budget_id) DO UPDATE SET limit_units=excluded.limit_units''',
-                (budget_id,period,unit,limit_units,start,end))
+            _write_budget(conn, config, old)
 
     def bind_task(self, task_id, *, budget_id=None, reserve_units=0, approval_scope=None, approval_id=None):
         _units(reserve_units)
@@ -416,15 +453,14 @@ class ControlPolicy:
                 raise DispatchError('handoff authorization does not cover this exact scope and expiry')
             authorized_by=_id(proof.get('authorized_by'))
         with self.store._tx() as conn:
-            conn.execute('INSERT INTO control_handoffs VALUES(?,?,?,?,?,?,?,?,?,\'offered\',NULL,\'[]\',?,?)',
-                (handoff_id,from_conv,to_conv,project_id,scope,json.dumps(refs),authorized_by,authorization_ref,expiry,self.store._now(),self.store._now()))
-            _event(conn,'handoff:'+handoff_id+':offered','handoff.offered',actor,self.store._now(),refs=(authorization_ref,) if authorization_ref else ())
+            _insert_handoff(conn, handoff_id, from_conv=from_conv, to_conv=to_conv, project_id=project_id, scope=scope,
+                            scope_refs=refs, authorized_by=authorized_by, authorization_ref=authorization_ref,
+                            expires_at=expiry, at=self.store._now())
 
     def _expire(self, conn):
         now=self.store._now()
         for row in conn.execute("SELECT * FROM control_handoffs WHERE state IN ('offered','accepted') AND expires_at<=?",(now,)).fetchall():
-            conn.execute("UPDATE control_handoffs SET state='expired',updated_at=? WHERE handoff_id=?",(now,row['handoff_id']))
-            _event(conn,'handoff:'+row['handoff_id']+':expired','handoff.expired','policy',now,code='authorization_expired')
+            _write_handoff_state(conn, row['handoff_id'], 'expired', 'policy', now)
 
     def handoff_transition(self, handoff_id, state, *, actor, receipt_ref=None):
         self._require_isolated('handoff_transition')
@@ -448,9 +484,7 @@ class ControlPolicy:
                     if not isinstance(refs,list) or not refs: raise DispatchError('completion output evidence required')
                     for ref in refs:
                         _hash(ref); self.artifacts.get(ref)
-                conn.execute('UPDATE control_handoffs SET state=?,receipt_ref=?,evidence_refs_json=?,updated_at=? WHERE handoff_id=?',
-                             (state,receipt_ref,json.dumps(refs),self.store._now(),handoff_id))
-                _event(conn,'handoff:'+handoff_id+':'+state,'handoff.'+state,actor,self.store._now(),refs=(receipt_ref,) if receipt_ref else ())
+                _write_handoff_state(conn, handoff_id, state, actor, self.store._now(), receipt_ref=receipt_ref, refs=refs)
         if denied: raise DispatchError(denied)
 
     def status(self, *, uncertain_after_hours=24):

@@ -47,6 +47,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 离线恢复现在也保留已结清的调度历史。恢复后可以只读查看原计划和时槽，即使历史上标为启用，已经到期的时槽也不会补跑。
 
+这版新增独立的中央维护入口，可在已激活的本机合成混合账本上设置共享预算、记录交接并查看状态。任务的领取、审批和最终结算继续走各自的执行路由。[中央维护用法](dispatch/docs/design/central_control.md)
+
 ## 当前进度
 
 公开版在 Windows 和隔离 Debian 上跑过本机样例。演示用合成资料和模拟审核。现役服务尚未采用这些更新，完整系统上线、跨设备执行、24 小时连续运行和真实数据库迁移仍待验证。
