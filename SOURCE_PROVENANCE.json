@@ -9,13 +9,12 @@
     "staged_sha256": "814be12fc8f1e09d6571edc53503b20dacead0553f1a49d73819803a2a88bace"
   },
   "M0_PREVIEW.md": {
-    "source": "public preview packaging",
-    "staged_sha256": "4d3aa4f850e3e9b4ca4e2ba27bd339fc1f7d83a93d1cab842c09fce4ce527600"
+    "source": "public preview documentation",
+    "staged_sha256": "5a19b21cd43c9e968349edde7c1906cb7e60c18594d8236970ad6a157d16f824"
   },
   "README.md": {
-    "source": "tools/m0_portable/CANDIDATE_README.md",
-    "source_sha256": "ce51ab4c2e71628c45123747d9d9e1a93abb52c01d2022596f518b78f7a83cc7",
-    "staged_sha256": "ce51ab4c2e71628c45123747d9d9e1a93abb52c01d2022596f518b78f7a83cc7"
+    "source": "public preview documentation",
+    "staged_sha256": "d784b0d40b803f89e954abe0bb82b382759760323e069f76b8e33d4c05d10628"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",

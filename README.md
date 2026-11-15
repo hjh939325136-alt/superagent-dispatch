@@ -1,33 +1,40 @@
-# SuperAgent M0 source candidate
+# SuperAgent M0 源码预览
 
-Requires Python 3.11 or later with SQLite and the standard library. Use `python3` or `py -3.11` if your installation uses that name. Use fresh output directories on a local filesystem. The fixture launchers generate local bindings based on their output directory and the selected Python executable.
+[English](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md) · [预览说明](M0_PREVIEW.md) · [开发更新](DEVELOPMENT_UPDATES.md) · [稳定版 v0.1.0 中文说明](https://github.com/hjh939325136-alt/superagent-dispatch#readme)
 
-## Synthetic acceptance
+M0 是 SuperAgent 的早期源码预览。在任务调度之外，它还提供几组本机演示。你可以查询样例项目记录、试走从资料检索到内容审核的流程，或者查看文件整理计划、试做备份和恢复。
 
-From the directory containing the candidate, replace `SuperAgent M0` with the extracted directory name. The sibling output directories keep generated data out of the source tree.
+## 用样例跑一遍
+
+需要 Python 3.11 或更新版本及其 SQLite 模块。先进入预览仓库根目录，试跑调度器：
 
 ```sh
-python -B "SuperAgent M0/superagent.py" manager-fixture --output "M0 manager fixture"
-python -B "SuperAgent M0/superagent.py" manager --binding "M0 manager fixture/manager-binding.json" < "SuperAgent M0/examples/manager-query.json"
-python -B "SuperAgent M0/superagent.py" pipeline-fixture --output "M0 pipeline fixture"
+python -I -B superagent.py dispatch selftest
 ```
 
-For the Manager request in PowerShell, use `Get-Content -Raw "SuperAgent M0/examples/manager-query.json" | python -B "SuperAgent M0/superagent.py" manager --binding "M0 manager fixture/manager-binding.json"` with a UTF-8 pipeline. The pipeline fixture invokes the normal content Dispatcher CLI, reads back pinned research references, and verifies script lineage, approval state, and revocation in `report.json`. The toy script and approval have no human review or publication authority. Bindings contain machine-local absolute paths and must be generated again when relocating. When supplying absolute output or binding paths, omit parent-traversal segments such as `..`.
+再回到仓库的上一级目录运行下方命令。将 `superagent-dispatch` 换成你解压或克隆得到的目录名。每次运行请选新的本地输出目录。
 
-## Entrypoints
+```sh
+python -B "superagent-dispatch/superagent.py" manager-fixture --output "M0 manager fixture"
+python -B "superagent-dispatch/superagent.py" pipeline-fixture --output "M0 pipeline fixture"
+```
 
-`dispatch selftest` exercises the separate synthetic Dispatcher bundle round trip. `research-search --help`, `research-binding --help`, and `content-contract --help` describe direct fixture operations. `research --config PATH` and `content --config PATH` register local components on the Dispatcher, and the pipeline fixture produces a working example TOML. `manager --binding PATH` consumes one JSON request on stdin. Its role fields are trusted-local selectors and provide no authentication. Use trusted local code, configuration and bindings. `manager sync` and `manager adopt` are explicit operator actions with separate bindings.
+生成查询演示后，可以用附带的 JSON 提问。查询命令需要配置文件的绝对路径，`$PWD` 会带入当前目录。在 Bash 等支持输入重定向的 shell 中运行：
 
-`retention init-fixture --new-root PATH` prepares a synthetic binding. `retention --binding PATH plan` produces a plan, and `apply-fixture` and `recover-fixture` require an isolated synthetic fixture and its fixture grant. `inventory --help` describes explicit JSON inventory projections. `tools.m0_storage.target` supplies the local storage API used by Manager.
+```sh
+python -B "superagent-dispatch/superagent.py" manager --binding "$PWD/M0 manager fixture/manager-binding.json" < "superagent-dispatch/examples/manager-query.json"
+```
 
-## Bound synthetic backup
+PowerShell 请使用 UTF-8 管道：
 
-Create a protected, operator-maintained copy of `examples/backup-target.json` outside the source tree. Fill in the existing dedicated absolute target directory, a byte quota at or below 209,715,200, and the directory's `st_dev` and `st_ino` from `os.stat`. Use a trusted absolute `pwsh.exe` on Windows and JSON `null` on Linux. Keep the binding under the same local operator trust as the Python launcher and executable. The binding is local configuration, with no cross-user authentication or permission isolation. Re-enroll it when the target directory or host changes.
+```powershell
+Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json" | python -B "superagent-dispatch/superagent.py" manager --binding "$PWD/M0 manager fixture/manager-binding.json"
+```
 
-Run `python -B superagent.py bound-backup preflight --binding BINDING --plan PLAN` to validate a synthetic allowlist and physical separation before writes. Run the same command with `backup` in place of `preflight` to write the verified archive. Only the binding supplies target location and quota. Plans use `m0.synthetic_backup_plan.v1` with `synthetic_only`, an absolute `source_root`, a unique `op_id`, and a `files` array of relative `path` and `kind` pairs. Linux also requires the library's `linux_devices` declaration, whose identities are checked against the local devices. Restore to a new test directory with `python -B superagent.py backup restore --archive ARCHIVE --target-root NEW_DIRECTORY`; Linux additionally requires `--expected-target-st-dev`. The legacy Windows CLI's direct backup and preflight route remains closed in this candidate. Use `bound-backup` for Windows backup and preflight.
+内容流程的 `report.json` 可以看到用了哪些资料、样例脚本从哪一步生成、模拟审核是否通过和撤销。演示使用程序生成的数据和模拟审核，接入真实资料、执行正式审核或发布需要单独验证。
 
-## Coordinator deployment files
+## 目前的进度
 
-`dispatch/deploy/` contains the Linux systemd installer, source check, synthetic state backup and verifier, smoke client, service unit and configuration templates. The source check discovers the included Dispatcher tests and runs its synthetic self-test. The identities example uses placeholders. See `dispatch/deploy/README.md` for target-host steps. This candidate check does not install or start the service.
+当前公开源码可以在本机试跑。完整系统上线、服务器安装、24 小时连续运行、跨设备执行和真实数据库迁移仍待验证。演示配置里有本机生成的绝对路径，换机器或移动目录后请重新生成。真实凭据和业务数据请留在原系统。
 
-This source snapshot covers the packaged M0 modules, synthetic fixtures, and launchers. It carries no deployed configuration, live bindings, service data, or operating history. This checkpoint does not establish 24-hour operation, real-data acceptance, cross-device execution, or production deployment. `SOURCE_PROVENANCE.json` records source and staged hashes, including the Windows backup path adjustments. `SHA256SUMS` covers every staged file other than the manifest itself. See `LICENSE` for the MIT terms.
+[预览说明](M0_PREVIEW.md)列出调度器测试、文件整理和部署模板。备份的目标配置、预检及恢复参数见 [英文进阶说明](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md#bound-synthetic-backup)。

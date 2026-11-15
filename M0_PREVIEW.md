@@ -1,26 +1,18 @@
-# M0 source preview
+# M0 预览说明
 
-This separate preview branch adds the M0 launcher and local Dispatcher, Manager,
-research/search, content, retention, inventory, and synthetic backup modules.
-Use Python 3.11 or later with SQLite and the standard library.
+[English](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/M0_PREVIEW.md) · [本机试用](README.md) · [开发更新](DEVELOPMENT_UPDATES.md)
 
-For the published v0.1.0 layout, check out tag `v0.1.0` and run
-`python -B -m sa_dispatch` from the repository root. In this preview, use
-`python -I -B superagent.py dispatch` from the root. For direct module use
-from the `dispatch` directory, the entry point is `python -B -m sa_dispatch`.
-Review the preview fixture commands in [README.md](README.md).
+如果你想看调度、资料查询和内容流程如何在一台电脑上串起来，可以从这个预览开始。只想试任务调度，可以下载 [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0)，在它的仓库根目录运行 `python -B -m sa_dispatch`。两个版本都需要 Python 3.11 或更新版本。
 
-The Manager accepts one JSON request on stdin. See
-[`examples/manager-query.json`](examples/manager-query.json). The local
-launcher prints CLI help with `manager --help`, `dispatch --help`,
-`research-search --help`, `content-contract --help`, and `retention --help`.
-Run the pipeline fixture to generate an example Dispatcher TOML and exercise
-the research references and synthetic approval through the normal CLI.
+## 可以试什么
 
-## Reproduce the Dispatcher checks
+- **任务调度**。从预览根目录运行 `python -I -B superagent.py dispatch --help`，可以查看调度器有哪些命令。
+- **查询和内容流程**。按 [本机试用步骤](README.md) 生成演示，查看如何读入一条查询、找回样例资料、记录模拟审核结果。查询入口从标准输入读取一条 JSON。请求里的角色字段仅供本机演示选择查询范围，访问身份需要另行验证。
+- **文件整理和备份**。运行 `python -B superagent.py retention --help` 查看整理命令，或运行 `python -B superagent.py inventory --help` 查看如何导出清单。备份前需要设置独立的本地目标目录和空间上限，详见[备份实验步骤（英文）](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md#bound-synthetic-backup)。
 
-From the preview root, run the following in a checkout with no external
-`PYTHONPATH` or `PYTHONHOME`.
+## 复查调度器
+
+从预览根目录进入 `dispatch/`。请用未额外配置 `PYTHONPATH` 和 `PYTHONHOME` 的环境运行：
 
 ```sh
 cd dispatch
@@ -28,20 +20,6 @@ python -B -m unittest discover -s tests -v
 python -B -m sa_dispatch selftest
 ```
 
-The public suite contains 226 tests and includes historical v1, v3, v4 and
-v5 compatibility fixtures.
-Historical fixture provenance retains the fields checked by the tests.
-The original v2 history test and its fixture are omitted because a
-hash-verified artifact records private host paths. The generated v2 tests
-remain in the suite. Test subprocesses use Python and synthetic data.
+测试使用 Python 和样例数据，包括读取几种旧版任务记录。具体的历史样例覆盖范围见 [原英文说明](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/M0_PREVIEW.md#reproduce-the-dispatcher-checks)。Linux systemd 模板和操作说明在 [dispatch/deploy](dispatch/deploy/README.md)，运行上述测试不会安装或启动系统服务。
 
-Systemd templates and scripts are available under `dispatch/deploy/`.
-This preview covers synthetic acceptance. Production data, 24-hour
-operation, server installation, real-data migration, and cross-device
-operation remain outside this preview. Use fresh local directories for
-generated state and keep live credentials and bindings outside the source tree.
-
-The release includes the MIT license, a byte manifest, and relative-source
-provenance. The fixture archives contain the original Python and SQL source
-used by the v4 and v5 compatibility tests. Git attributes preserve tracked
-bytes for manifest verification.
+M0 的验收范围是本机样例。完整系统上线、服务器安装、24 小时连续运行、跨设备操作和真实数据库迁移仍待验证。源码以 [MIT 协议](LICENSE)公开，`SHA256SUMS` 可用于校验下载到的文件，`SOURCE_PROVENANCE.json` 记录各文件的来源。

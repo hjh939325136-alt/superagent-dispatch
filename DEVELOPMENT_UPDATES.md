@@ -1,9 +1,11 @@
-# Development updates
+# 开发更新
 
 ## 0.1.1-m0.1 (2026-11-15)
 
-Document the M0 synthetic source preview and start reproducible development updates.
+首次公开整理 M0 预览的试用说明，并开始在这里记录开发进展。
 
-- Provide the portable launcher, Dispatcher, Manager, research search, content approval, inventory, retention and synthetic backup modules.
-- Include public compatibility tests and deployment templates with explicit synthetic-only acceptance boundaries.
-- Record release notes deterministically; keep the stable main branch and v0.1.0 tag unchanged.
+- 可以在本机用样例试跑任务调度、资料查询、内容审核演示，以及清单、文件整理和备份工具。
+- 仓库附上读取旧版记录的测试和 Linux 服务模板。这一阶段只验收了样例，24 小时连续运行、跨设备执行和真实数据库迁移仍待验证。
+- 想上手可以先看 [M0 试用步骤](README.md)。只想体验单机任务调度，可从 [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0) 开始。
+
+[本次记录的英文原文](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/DEVELOPMENT_UPDATES.md)
