@@ -10,11 +10,11 @@
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "8bef486aa75d3e740ee431445e903b1d7074823a72fd15aec962d21eee6594dc"
+    "staged_sha256": "ac06259f473318d29f85810a2f4dcb111285ce6a337d5d340ef6f3f0b4974424"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "7a9bd7401e19c128bd90eddafc1c8a9b61b02c73aa0ccaa74372d425f4d06017"
+    "staged_sha256": "a23dc6abbf40d5aa9f4ca2d91d93500b9cb4a3309bce6863671383b8f467dadf"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -123,8 +123,8 @@
   },
   "dispatch/sa_dispatch/collector_cli.py": {
     "source": "dispatch/sa_dispatch/collector_cli.py",
-    "source_sha256": "7e024f8f02c5d4fde47616f7b4c914ca1a1046bd48f5236febab939c883411e8",
-    "staged_sha256": "7e024f8f02c5d4fde47616f7b4c914ca1a1046bd48f5236febab939c883411e8"
+    "source_sha256": "7f02882d9ff7e5ad26ab2d4fbdf8c1daca65404a00fc4ef8fc88eb90e49548be",
+    "staged_sha256": "7f02882d9ff7e5ad26ab2d4fbdf8c1daca65404a00fc4ef8fc88eb90e49548be"
   },
   "dispatch/sa_dispatch/component_proof.py": {
     "source": "dispatch/sa_dispatch/component_proof.py",
@@ -735,6 +735,11 @@
     "source": "dispatch/tests/test_collector.py",
     "source_sha256": "2fdc510820dcdaf6d0b9dd82f213949e6072027ba3850cac16cafcc528492ee2",
     "staged_sha256": "2fdc510820dcdaf6d0b9dd82f213949e6072027ba3850cac16cafcc528492ee2"
+  },
+  "dispatch/tests/test_collector_protocol.py": {
+    "source": "dispatch/tests/test_collector_protocol.py",
+    "source_sha256": "832a5f66015f48c8710221294ed7adbced4fd2bec9311859d7b6e7a5de9fd6f8",
+    "staged_sha256": "832a5f66015f48c8710221294ed7adbced4fd2bec9311859d7b6e7a5de9fd6f8"
   },
   "dispatch/tests/test_component_proof.py": {
     "source": "dispatch/tests/test_component_proof.py",

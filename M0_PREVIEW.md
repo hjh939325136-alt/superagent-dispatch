@@ -22,6 +22,12 @@ Manager 的查询 JSON 包含 `op`、`role` 和 `args`。可以加上 `"schema_v
 python -B -m unittest tools.m0_manager.test_protocol
 ```
 
+## 采集命令的版本
+
+独立的 Collector `sync` 和 `adopt`，包括通过 `manager sync` 或 `manager adopt` 转发的调用，都接受可选的 `"schema_version":"0.1"`。旧请求仍兼容。请求会先检查字段和版本，再读取本机的可信配置。成功与受控的 JSON 错误都会带上版本，退出码分别为 `0` 和 `1`。使用命令行时，如果参数写错，帮助和报错仍由命令行解析器处理。
+
+`ok: true` 表示命令处理完毕。同步是否实际完成要看 `result.state`。如果状态为 `frozen`，先检查来源和缺口，再决定是否通过 `adopt` 由操作员明确接续。版本字段与来源许可或登录身份无关。
+
 ## 复查调度器
 
 从预览根目录进入 `dispatch/`。请用未额外配置 `PYTHONPATH` 和 `PYTHONHOME` 的环境运行：
