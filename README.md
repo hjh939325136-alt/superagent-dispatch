@@ -1,8 +1,13 @@
 # SuperAgent M0 源码预览
 
-[English](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md) · [预览说明](M0_PREVIEW.md) · [开发更新](DEVELOPMENT_UPDATES.md) · [稳定版 v0.1.0 中文说明](https://github.com/hjh939325136-alt/superagent-dispatch#readme)
+[English（早期预览）](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/README.md) · [预览说明](M0_PREVIEW.md) · [开发更新](DEVELOPMENT_UPDATES.md) · [稳定版 v0.1.0 中文说明](https://github.com/hjh939325136-alt/superagent-dispatch#readme)
 
 M0 是 SuperAgent 的早期源码预览。在任务调度之外，它还提供几组本机演示。你可以查询样例项目记录、试走从资料检索到内容审核的流程，或者查看文件整理计划、试做备份和恢复。
+
+## 这一版可以试什么
+
+- **查询格式更明确。** Manager 仍接受原来的 JSON 查询。调用方可以加上 `"schema_version":"0.1"`，成功和查询错误的 JSON 回复都会标明版本。
+- **可查到样例内容事件。** 内容演示把样例脚本生成和模拟审核等事件的摘要与引用汇入调度账本。重复同步不会追加重复记录，也不会复制原文或调用发布平台。
 
 ## 用样例跑一遍
 

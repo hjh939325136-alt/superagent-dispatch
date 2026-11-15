@@ -7,6 +7,9 @@ from .binding import ROLES, load_binding, digest, now, instant, token, fixed_ref
 from .readonly import SourceError
 from .dispatch_source import dispatch_query
 
+QUERY_SCHEMA_VERSION = '0.1'
+REQUEST_FIELDS = {'op', 'role', 'args'}
+ALLOWED_REQUEST_FIELDS = REQUEST_FIELDS | {'schema_version'}
 FIELDS = {
     'status': {'source_id','limit'},
     'task.get': {'source_id','task_id'},
@@ -36,8 +39,11 @@ POLICY = {'version':1,'roles':sorted(ROLES),'technical_attention':sorted(TECHNIC
 
 
 def validate(request):
-    if not isinstance(request, dict) or set(request) != {'op','role','args'}:
+    if not isinstance(request, dict) or not REQUEST_FIELDS <= request.keys() <= ALLOWED_REQUEST_FIELDS:
         raise SourceError('E_FIELD_NOT_ALLOWED')
+    version = request.get('schema_version', QUERY_SCHEMA_VERSION)
+    if not isinstance(version, str) or version != QUERY_SCHEMA_VERSION:
+        raise SourceError('E_PROTOCOL_UNSUPPORTED')
     op, role, args = request['op'], request['role'], request['args']
     if not isinstance(op,str) or not isinstance(role,str) or op not in FIELDS or role not in ROLES:
         raise SourceError('E_OPERATION_NOT_ALLOWED')
@@ -96,7 +102,7 @@ def run(request, binding_path):
                    and not (op=='trace.get' and (('task_id' in args)!=(s['kind']=='dispatch')))]
         if 'source_id' in args and not sources:
             raise SourceError('E_SOURCE_KIND_NOT_ALLOWED')
-    output = {'ok':True,'op':op,'role':role,
+    output = {'schema_version':QUERY_SCHEMA_VERSION,'ok':True,'op':op,'role':role,
               'role_template':f'manager/role/{role}@1#sha256:{digest(POLICY)}',
               'binding':f'manager/binding@1#sha256:{binding_hash}',
               'sources':[],'items':[],'withheld':{'by_role':0,'by_class':0,'by_policy':0},

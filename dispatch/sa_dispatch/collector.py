@@ -4,7 +4,7 @@ Bindings are trusted local configuration, not request authorization. Enrollment
 pins a caller-assigned instance plus OS file identity; catalog markers are also
 checked. No path alone can authorize resuming an imported cursor.
 """
-from contextlib import closing, nullcontext
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 import hashlib
 import json
@@ -33,8 +33,41 @@ CREATE TABLE IF NOT EXISTS collector_gaps(
  resolved_at TEXT, resolution TEXT, resolved_by TEXT);
 '''
 STREAMS={'dispatch':('events','control_events','schedule_events','reconciliations','host_events'),
-         'catalog':('changes',),'fixture_hook':('hook_events',),'fixture_handoff':('handoffs',)}
+         'catalog':('changes',),'fixture_hook':('hook_events',),'fixture_handoff':('handoffs',),
+         'content':('content_events',)}
 REASONS=frozenset(('accept_new_instance','accept_gap','accept_rewrite','accept_schema','accept_redaction','bind_imported_history'))
+CONTENT_SCHEMA='m0-content-synthetic-v1'
+CONTENT_WORKFLOW_SCHEMA='m0.research_content_workflow.v1'
+# Only these three producer tables are read. Pin their DDL including constraints
+# so a view, generated column, or non-rowid replacement cannot pass enrollment.
+CONTENT_TABLES={
+    'meta':'CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+    'artifacts':('CREATE TABLE artifacts(ref TEXT PRIMARY KEY, identity TEXT NOT NULL, version INTEGER NOT NULL, '
+                 'trace_id TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(identity,version))'),
+    'content_events':('CREATE TABLE content_events(seq INTEGER PRIMARY KEY, event_id TEXT UNIQUE NOT NULL, '
+                      'trace_id TEXT NOT NULL, operation TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, '
+                      'refs_json TEXT NOT NULL, metadata_json TEXT NOT NULL)'),
+}
+CONTENT_TOKEN=re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}')
+CONTENT_REF=re.compile(r'([a-z][a-z0-9_-]*/[a-z][a-z0-9_-]*/[A-Za-z0-9:_-]+)@([1-9][0-9]*)#([0-9a-f]{64})')
+CONTENT_OPERATIONS={
+    'artifact.put': ('content-fixture-artifact', (None,)),
+    'content.script_from_context': ('content-script', ('creative/context', 'mgmt/script')),
+    'approval.record': ('content-approval', ('mgmt/approval',)),
+    'publish.prepare': ('content-fixture-publish', ('webee/publish_prep',)),
+    'fixture.submit_unknown': ('content-fixture-publish', ('webee/publish_prep',)),
+    'publish.observe': ('content-fixture-publish', ('webee/receipt',)),
+    'publish.metrics_import': ('content-fixture-publish', ('webee/metrics_obs',)),
+    'publish.metrics_match': ('content-fixture-publish', ('webee/metrics_match',)),
+    'strategy.activate': ('content-fixture-strategy', ('mgmt/strategy_change',)),
+    'strategy.rollback': ('content-fixture-strategy', ('mgmt/strategy_change',)),
+}
+CONTENT_OUTCOMES={
+    'approval.record': {'approval.decided': {'decision':'observed'}},
+    'fixture.submit_unknown': {'task.unknown': {'to_status':'unknown'}},
+    'publish.observe': {'task.reconciled': {'to_status':'succeeded'}, 'task.failed': {'to_status':'failed'},
+                        'task.cancelled': {'to_status':'cancelled'}},
+}
 
 
 def validate_records(cursors,gaps):
@@ -92,6 +125,11 @@ def plain(path):
 def file_identity(path):
     s=plain(path).stat()
     return f'{s.st_dev}:{s.st_ino}'
+
+
+def binding_identity_matches(binding):
+    try:return file_identity(binding.locator)==binding.file_identity
+    except (FileNotFoundError,ValueError):return False
 
 
 def _mount_info():return Path('/proc/self/mountinfo').read_text()
@@ -169,6 +207,17 @@ def readonly(path):
 
 
 def source_info(conn,binding,stream,*,require_stream=True):
+    if binding.kind=='content':
+        definitions={row[0]:' '.join(row[1].split()) for row in conn.execute(
+            "SELECT name,sql FROM sqlite_schema WHERE type='table' AND name IN ('meta','artifacts','content_events')")}
+        if definitions!=CONTENT_TABLES:raise ValueError('unsupported content table schema')
+        meta=dict(conn.execute('SELECT key,value FROM meta'))
+        if 'workflow_schema' in meta and meta.pop('workflow_schema')!=CONTENT_WORKFLOW_SCHEMA:
+            raise ValueError('unsupported content workflow schema')
+        if set(meta)!={'schema','instance','platform_calls'} or meta['schema']!=CONTENT_SCHEMA or meta['platform_calls']!='0':
+            raise ValueError('not a synthetic content source')
+        if meta['instance']!=binding.source_instance:raise LookupError('instance_changed')
+        return CONTENT_SCHEMA,digest(definitions)
     columns=[list(r) for r in conn.execute('PRAGMA table_info('+stream+')')]
     if not columns and require_stream:raise ValueError('missing source table')
     if binding.kind=='dispatch':
@@ -199,6 +248,45 @@ def raw_ref(value,owner,ident):
     return f'{owner}/artifact/{ident}@1#{value[7:]}'
 
 
+def content_refs(source,row):
+    if any(not isinstance(value,str) for key,value in row.items() if key not in ('seq','_collector_seq')):
+        raise ValueError('content event text fields must be text')
+    operation=row['operation']
+    component,expected=CONTENT_OPERATIONS[operation]
+    refs=json.loads(row['refs_json'])
+    if not isinstance(refs,list) or len(refs)!=len(expected):raise ValueError('invalid content refs')
+    for ref,prefix in zip(refs,expected):
+        match=CONTENT_REF.fullmatch(ref) if isinstance(ref,str) and len(ref)<=256 else None
+        if not match:raise ValueError('invalid content ref')
+        identity,version,sha=match.groups()
+        owner_kind=identity.rsplit('/',1)[0]
+        if prefix is not None and owner_kind!=prefix:raise ValueError('unexpected content ref kind')
+        artifact=source.execute('SELECT identity,version,trace_id,payload FROM artifacts WHERE ref=?',(ref,)).fetchone()
+        if artifact is None or tuple(artifact)[:3]!=(identity,int(version),row['trace_id']):
+            raise ValueError('content ref is outside the event trace')
+        raw=artifact['payload']
+        if not isinstance(raw,str) or len(raw)>1024*1024:raise ValueError('invalid content artifact size')
+        payload=json.loads(raw)
+        owner,kind,ident=identity.split('/')
+        if (not isinstance(payload,dict) or payload.get('synthetic') is not True or
+                payload.get('class')!='internal' or not isinstance(payload.get('body'),dict) or
+                [payload.get(key) for key in ('owner','kind','id','version','trace_id')]!=
+                [owner,kind,ident,int(version),row['trace_id']] or digest(payload)!=sha):
+            raise ValueError('content artifact does not match its fixed ref')
+    body=payload['body']
+    if operation=='content.script_from_context' and (payload.get('derived_from')!=refs[:1] or body.get('context_ref')!=refs[0] or
+            body.get('generation')!='template_synthetic' or body.get('ai_generated') is not False):
+        raise ValueError('content script does not bind its synthetic context')
+    if operation in ('content.script_from_context','approval.record') and (
+            body.get('human_reviewed') is not False or body.get('publish_authorized') is not False):
+        raise ValueError('content fixture cannot authorize human review or publishing')
+    if operation=='publish.observe':
+        states={'task.reconciled':'published','task.failed':'rejected','task.cancelled':'withdrawn'}
+        if body.get('verification_status')!='unverified_import' or body.get('observed_status')!=states.get(row['kind']):
+            raise ValueError('content receipt is not a matching fixture observation')
+    return component,refs
+
+
 def enrich(source,binding,stream,row):
     row=dict(row)
     if stream=='changes':
@@ -207,6 +295,8 @@ def enrich(source,binding,stream,row):
                                (row['ref_id'],row['version'])).fetchone()
         if not version:raise ValueError('change has no immutable version')
         row['_fixed_ref']=f"{meta['domain']}/note/{row['ref_id']}@{row['version']}#{version[0]}"
+    elif stream=='content_events':
+        row['_component'],row['_refs']=content_refs(source,row)
     return row
 
 
@@ -246,6 +336,15 @@ def project(binding,stream,row,at):
         event.update(kind='handoff.'+state,at=row['at'],actor='handoff-adapter',component='handoff')
         event['refs']=json.loads(row['refs_json'])
         if state=='completed' and not event['refs']:raise ValueError('receipt required')
+    elif stream=='content_events':
+        trace=row['trace_id'];kind=row['kind'];metadata=json.loads(row['metadata_json'])
+        if not isinstance(trace,str) or not CONTENT_TOKEN.fullmatch(trace):raise ValueError('invalid content trace')
+        if not isinstance(row['event_id'],str) or not re.fullmatch('[0-7][0-9A-HJKMNP-TV-Z]{25}',row['event_id']):
+            raise ValueError('invalid content event id')
+        outcome=CONTENT_OUTCOMES.get(row['operation'],{'task.succeeded':{}})
+        if not isinstance(metadata,dict) or metadata!=outcome.get(kind) or canonical(metadata)!=row['metadata_json']:
+            raise ValueError('invalid content event outcome')
+        event.update(kind=kind,component=row['_component'],refs=row['_refs'],metadata=metadata,trace_id=trace)
     for key in ('actor','component'):_token(event[key])
     if task is not None:_token(task)
     if fence is not None and (type(fence) is not int or fence<0):raise ValueError('invalid fence')
@@ -253,7 +352,10 @@ def project(binding,stream,row,at):
     if any(not isinstance(ref,str) or not _REF.fullmatch(ref) for ref in event['refs']):raise ValueError('invalid fixed ref')
     if any(k not in _META_VALUES or v not in _META_VALUES[k] for k,v in event['metadata'].items()):raise ValueError('invalid metadata')
     event['at']=_at(event['at'])
-    event['trace_id']=task or binding.source_id+':'+stream
+    if stream=='content_events':
+        if event['at']<'1970-01-01':raise ValueError('content timestamp outside range')
+    else:
+        event['trace_id']=task or binding.source_id+':'+stream
     # Count omitted free prose without retaining it. Nested Hook fields are
     # omitted in exactly the same way; the raw hash is only an anchor.
     redacted=sum(bool(row.get(key)) for key in ('reason','detail','detail_code','body'))
@@ -267,13 +369,28 @@ class Collector:
     def _connect(self):
         c=sqlite3.connect(local_sqlite_file(self.target),timeout=10);c.row_factory=sqlite3.Row;return c
 
+    @contextmanager
     def _source_snapshot(self, target, binding, target_identity):
+        if not binding_identity_matches(binding):
+            yield None
+            return
         source_path=local_sqlite_file(binding.locator)
-        if file_identity(source_path)==target_identity==file_identity(self.target):
+        if binding.file_identity==target_identity==file_identity(self.target):
+            if binding.kind=='content':raise ValueError('content source must be separate from target')
             # BEGIN IMMEDIATE already provides the source snapshot. A second
             # connection's read lock blocks cache spill in rollback-journal mode.
-            return nullcontext(target)
-        return closing(readonly(source_path))
+            yield target
+            return
+        if binding.kind=='content':
+            # A read-only SQLite WAL connection may still create a SHM file.
+            # Read the header before holding any SQLite lock on the content file.
+            with source_path.open('rb') as file:
+                header=file.read(20)
+            if not header.startswith(b'SQLite format 3\0') or header[18:20]!=b'\x01\x01':
+                yield False
+                return
+        with closing(readonly(source_path)) as source:
+            yield source if binding_identity_matches(binding) else None
 
     def _gap(self,c,b,stream,kind,last,maximum,at):
         existing=c.execute('SELECT gap_id FROM collector_gaps WHERE source_id=? AND stream=? AND resolved_at IS NULL',(b.source_id,stream)).fetchone()
@@ -287,23 +404,26 @@ class Collector:
         binding.validate(stream)
         if type(limit) is not int or not 1<=limit<=1000:raise ValueError('invalid batch bound')
         if binding.collection_mode=='snapshot_only':
-            if file_identity(binding.locator)!=binding.file_identity:raise ValueError('source identity mismatch')
-            with closing(readonly(binding.locator)) as source:
+            with self._source_snapshot(None,binding,None) as source:
+                if not source:raise ValueError('source identity or journal mode mismatch')
                 version,_=source_info(source,binding,stream,require_stream=False)
                 if version not in binding.accepted_schema_versions:raise ValueError('unaccepted schema')
             return {'state':'snapshot_only','incremental':'unsupported','added':0,
                     'source_instance':binding.source_instance,'projection_lag':None}
         at=timestamp(self.clock.now())
         target_identity=file_identity(self.target)
+        if binding.kind=='content' and binding.file_identity==target_identity:raise ValueError('content source must be separate from target')
         with closing(self._connect()) as c,c:
             c.execute('BEGIN IMMEDIATE')
             prior=c.execute('SELECT * FROM collector_cursors WHERE source_id=? AND stream=?',(binding.source_id,stream)).fetchone()
             last=prior['last_seq'] if prior else 0
             gap=c.execute('SELECT kind FROM collector_gaps WHERE source_id=? AND stream=? AND resolved_at IS NULL',(binding.source_id,stream)).fetchone()
             if gap:return {'state':'frozen','kind':gap['kind'],'last_seq':last}
-            if (prior and (prior['authority']!='local_owned' or prior['source_instance']!=binding.source_instance or prior['binding_sha256']!=binding.fingerprint())) or file_identity(binding.locator)!=binding.file_identity:
+            if prior and (prior['authority']!='local_owned' or prior['source_instance']!=binding.source_instance or prior['binding_sha256']!=binding.fingerprint()):
                 return self._gap(c,binding,stream,'instance_changed',last,last,at)
             with self._source_snapshot(c,binding,target_identity) as source:
+                if source is None:return self._gap(c,binding,stream,'instance_changed',last,last,at)
+                if source is False:return self._gap(c,binding,stream,'schema_changed',last,last,at)
                 try:version,schema=source_info(source,binding,stream)
                 except LookupError:return self._gap(c,binding,stream,'instance_changed',last,last,at)
                 except (ValueError,KeyError,sqlite3.DatabaseError):return self._gap(c,binding,stream,'schema_changed',last,last,at)
@@ -316,14 +436,14 @@ class Collector:
                     anchor=source.execute('SELECT rowid AS _collector_seq,* FROM '+stream+' WHERE rowid=?',(last,)).fetchone()
                     if anchor is None:return self._gap(c,binding,stream,'source_truncated',last,maximum,at)
                     try:anchor=enrich(source,binding,stream,anchor)
-                    except (ValueError,KeyError,sqlite3.DatabaseError):return self._gap(c,binding,stream,'source_rewritten',last,maximum,at)
+                    except (ValueError,KeyError,TypeError,RecursionError,sqlite3.DatabaseError):return self._gap(c,binding,stream,'source_rewritten',last,maximum,at)
                     if digest(anchor)!=prior['anchor_sha256']:return self._gap(c,binding,stream,'source_rewritten',last,maximum,at)
                 try:rows=[enrich(source,binding,stream,r) for r in source.execute('SELECT rowid AS _collector_seq,* FROM '+stream+' WHERE rowid>? ORDER BY rowid LIMIT ?',(last,limit))]
-                except (ValueError,KeyError,sqlite3.DatabaseError):return self._gap(c,binding,stream,'redaction_rejected',last,maximum,at)
+                except (ValueError,KeyError,TypeError,RecursionError,sqlite3.DatabaseError):return self._gap(c,binding,stream,'redaction_rejected',last,maximum,at)
                 if any(r['_collector_seq']!=last+i+1 for i,r in enumerate(rows)):
                     return self._gap(c,binding,stream,'seq_gap',last,maximum,at)
                 try:projected=[project(binding,stream,r,at) for r in rows]
-                except (ValueError,KeyError,TypeError):return self._gap(c,binding,stream,'redaction_rejected',last,maximum,at)
+                except (ValueError,KeyError,TypeError,AttributeError,OverflowError,RecursionError):return self._gap(c,binding,stream,'redaction_rejected',last,maximum,at)
                 epoch=prior['epoch'] if prior else 1
                 namespace=f'{binding.source_id}@{binding.source_instance}:e{epoch}'
                 for row,(event,redacted) in zip(rows,projected):
@@ -353,12 +473,14 @@ class Collector:
         if file_identity(binding.locator)!=binding.file_identity:raise ValueError('source identity mismatch')
         at=timestamp(self.clock.now())
         target_identity=file_identity(self.target)
+        if binding.kind=='content' and binding.file_identity==target_identity:raise ValueError('content source must be separate from target')
         with closing(self._connect()) as c,c:
             c.execute('BEGIN IMMEDIATE')
             prior=c.execute('SELECT * FROM collector_cursors WHERE source_id=? AND stream=?',(binding.source_id,stream)).fetchone()
             gap=c.execute('SELECT 1 FROM collector_gaps WHERE source_id=? AND stream=? AND resolved_at IS NULL',(binding.source_id,stream)).fetchone()
             if not gap and (not prior or prior['authority']=='local_owned'):raise ValueError('adoption requires frozen or imported stream')
             with self._source_snapshot(c,binding,target_identity) as source:
+                if not source:raise ValueError('source identity or journal mode mismatch')
                 version,schema=source_info(source,binding,stream)
                 if version not in binding.accepted_schema_versions:raise ValueError('unaccepted schema')
                 row=source.execute('SELECT rowid AS _collector_seq,* FROM '+stream+' WHERE rowid=?',(resume_after,)).fetchone() if resume_after else None

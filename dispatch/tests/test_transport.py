@@ -40,7 +40,13 @@ class TransportTests(unittest.TestCase):
         headers={'Content-Type':'application/json','Authorization':'Bearer '+self.tokens.get(device,'bad')}
         headers.update(extra or {})
         c.request('POST',path,json.dumps(payload),headers)
-        response=c.getresponse();result=(response.status,json.loads(response.read()));c.close();return result
+        response=c.getresponse();result=(response.status,json.loads(response.read()));c.close()
+        self.assertEqual(result[1].get('schema'),'sa_dispatch.v0')
+        self.assertIs(result[1].get('ok'),result[0] < 400)
+        if result[0] >= 400:
+            self.assertIsInstance(result[1]['error']['code'],str)
+            self.assertIsInstance(result[1]['error']['retryable'],bool)
+        return result
 
     def test_identity_binding_and_replay(self):
         status,body=self.call('/claim',{});self.assertEqual(status,200)

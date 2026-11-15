@@ -9,3 +9,11 @@
 - 想上手可以先看 [M0 试用步骤](README.md)。只想体验单机任务调度，可从 [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0) 开始。
 
 [本次记录的英文原文](https://github.com/hjh939325136-alt/superagent-dispatch/blob/562daf314fe0f822a1eb04b646010369a3661735/DEVELOPMENT_UPDATES.md)
+
+## 0.1.1-m0.2 (2026-11-15)
+
+M0 预览现在可以查到样例内容事件，Manager 的查询回复也会标明格式版本。
+
+- Manager 仍接受原来的 JSON 请求。调用方可以显式指定版本 0.1，查询成功或出错时都能从 JSON 回复读到版本。
+- 内容演示会把脚本生成和模拟审核等事件的摘要和引用汇入调度账本，重复同步不会新增同一批记录。
+- 中文试用说明新增了查询与查阅内容事件的步骤。本次验收使用本机样例，现有运行服务尚未升级。

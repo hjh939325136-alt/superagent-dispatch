@@ -10,11 +10,11 @@
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5a19b21cd43c9e968349edde7c1906cb7e60c18594d8236970ad6a157d16f824"
+    "staged_sha256": "8bef486aa75d3e740ee431445e903b1d7074823a72fd15aec962d21eee6594dc"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "d784b0d40b803f89e954abe0bb82b382759760323e069f76b8e33d4c05d10628"
+    "staged_sha256": "7a9bd7401e19c128bd90eddafc1c8a9b61b02c73aa0ccaa74372d425f4d06017"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -118,8 +118,8 @@
   },
   "dispatch/sa_dispatch/collector.py": {
     "source": "dispatch/sa_dispatch/collector.py",
-    "source_sha256": "d311ebc168e52436bd3599e1aa90062ae36971ff711e7fc9b54e0ba4f102111f",
-    "staged_sha256": "d311ebc168e52436bd3599e1aa90062ae36971ff711e7fc9b54e0ba4f102111f"
+    "source_sha256": "a03c0e1d80631ece0eff15399d8870faab66f01ba61d5d0ac624c4f234e6dc5d",
+    "staged_sha256": "a03c0e1d80631ece0eff15399d8870faab66f01ba61d5d0ac624c4f234e6dc5d"
   },
   "dispatch/sa_dispatch/collector_cli.py": {
     "source": "dispatch/sa_dispatch/collector_cli.py",
@@ -746,6 +746,11 @@
     "source_sha256": "b66f2224aea68e0e51ba06f51ef95ea2be3512ffd1517acc1611c583a7e4ed9c",
     "staged_sha256": "b66f2224aea68e0e51ba06f51ef95ea2be3512ffd1517acc1611c583a7e4ed9c"
   },
+  "dispatch/tests/test_content_collector.py": {
+    "source": "dispatch/tests/test_content_collector.py",
+    "source_sha256": "5bf37edce6453368aae7bb866c371e0ff00e78a9ba1f86bb679628f2cf4db125",
+    "staged_sha256": "5bf37edce6453368aae7bb866c371e0ff00e78a9ba1f86bb679628f2cf4db125"
+  },
   "dispatch/tests/test_control_cli.py": {
     "source": "dispatch/tests/test_control_cli.py",
     "source_sha256": "88defa86ea6178e7559edab7444d178ef231a39dc438e4d6fa54b28e23036348",
@@ -833,8 +838,8 @@
   },
   "dispatch/tests/test_transport.py": {
     "source": "dispatch/tests/test_transport.py",
-    "source_sha256": "3c884e1fd5715f5a6722e953a57f490c56ca3af804182e6233901611e303e33e",
-    "staged_sha256": "3f0d703f9f192a398437b27fd8cc55f23403ab13442524470be7e2f2be11c1fa"
+    "source_sha256": "b22d12d3b1330573ddf50c3a202c394ff4a56709c454465475ce7789c0ca5ac7",
+    "staged_sha256": "7e7e0940bc10713b0e5d1d55e1081a7fdad5290e8aa90dd6007f2612c8082197"
   },
   "dispatch/tests/test_unified_events.py": {
     "source": "dispatch/tests/test_unified_events.py",
@@ -883,8 +888,8 @@
   },
   "knowledge/m0_content/run_research_pipeline_lab.py": {
     "source": "knowledge/m0_content/run_research_pipeline_lab.py",
-    "source_sha256": "b2e1af6b8d8a64e6fae1a5f5e06aa88a0459ff8e780efb65690c8280706e9494",
-    "staged_sha256": "b2e1af6b8d8a64e6fae1a5f5e06aa88a0459ff8e780efb65690c8280706e9494"
+    "source_sha256": "909eb88049bf8374bc12f392fe216b8b1469ac82965d4a8ac2a6fcbeb00d4e0f",
+    "staged_sha256": "909eb88049bf8374bc12f392fe216b8b1469ac82965d4a8ac2a6fcbeb00d4e0f"
   },
   "knowledge/m0_content/workflow_binding.py": {
     "source": "knowledge/m0_content/workflow_binding.py",
@@ -1003,8 +1008,8 @@
   },
   "tools/m0_manager/__main__.py": {
     "source": "tools/m0_manager/__main__.py",
-    "source_sha256": "f77b529a3c6e3b5aeec4294e903a3e1e5f87084070988ab13fdc3553ba8a6755",
-    "staged_sha256": "f77b529a3c6e3b5aeec4294e903a3e1e5f87084070988ab13fdc3553ba8a6755"
+    "source_sha256": "73721f566992703f6e84e26a207554a27015852a6e08c9e9922e96fb9c06e4e4",
+    "staged_sha256": "73721f566992703f6e84e26a207554a27015852a6e08c9e9922e96fb9c06e4e4"
   },
   "tools/m0_manager/attention.py": {
     "source": "tools/m0_manager/attention.py",
@@ -1058,13 +1063,18 @@
   },
   "tools/m0_manager/manager.py": {
     "source": "tools/m0_manager/manager.py",
-    "source_sha256": "2e350468c5cae150b34c6a9207c56e814b9481ba498c2b29bf9e57b053cc7e0c",
-    "staged_sha256": "2e350468c5cae150b34c6a9207c56e814b9481ba498c2b29bf9e57b053cc7e0c"
+    "source_sha256": "0305ff934d9ac6502896d187dee9a05b896f352f342d68bb2e3fea8bd245c531",
+    "staged_sha256": "0305ff934d9ac6502896d187dee9a05b896f352f342d68bb2e3fea8bd245c531"
   },
   "tools/m0_manager/readonly.py": {
     "source": "tools/m0_manager/readonly.py",
     "source_sha256": "6ec22329b5e2930165a268a26f3141e9822f0d7c6fa62388586eccdc22b18689",
     "staged_sha256": "6ec22329b5e2930165a268a26f3141e9822f0d7c6fa62388586eccdc22b18689"
+  },
+  "tools/m0_manager/test_protocol.py": {
+    "source": "tools/m0_manager/test_protocol.py",
+    "source_sha256": "2fc7f990feaee4113508b707304242274c4cc78a4e3c35673fc574f6ccde72a2",
+    "staged_sha256": "2fc7f990feaee4113508b707304242274c4cc78a4e3c35673fc574f6ccde72a2"
   },
   "tools/m0_portable/backup_target.py": {
     "source": "tools/m0_portable/backup_target.py",

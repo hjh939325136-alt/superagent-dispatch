@@ -125,13 +125,15 @@ def counts(path,tables):
 def snapshot(paths):
     result={}
     for path in paths:
+        path=Path(path)
         for selected in (path,Path(str(path)+'-wal'),Path(str(path)+'-shm'),Path(str(path)+'-journal')):
             result[str(selected)]={'sha256':hashlib.sha256(selected.read_bytes()).hexdigest(),'mtime_ns':selected.stat().st_mtime_ns} if selected.exists() else None
     return result
 
 
 def sync_events(work,binding):
-    sources=[SourceBinding.enroll('workflow-dispatch','dispatch',work/'ledger.sqlite3','workflow-dispatch',('0011',))]
+    sources=[SourceBinding.enroll('workflow-dispatch','dispatch',work/'ledger.sqlite3','workflow-dispatch',('0011',)),
+             SourceBinding.enroll('workflow-content','content',binding.content_path,binding.content_instance,('m0-content-synthetic-v1',))]
     for domain in ('research-scatter','research-content'):
         sources.append(SourceBinding.enroll(domain,'catalog',binding.research.catalog_root/(domain+'.sqlite3'),
                                            binding.research.instance,('m0-synthetic-research-catalog-v1',)))
@@ -139,19 +141,56 @@ def sync_events(work,binding):
     write(trusted,{'schema':'sa_dispatch.collector_binding.v1','target':str(work/'ledger.sqlite3'),
                    'sources':[asdict(source) for source in sources]})
     calls=[]
+    streams={'dispatch':('events','control_events','reconciliations'),'catalog':('changes',),'content':('content_events',)}
+    content_count=counts(binding.content_path,['content_events'])['content_events']
+    sources_before=snapshot(source.locator for source in sources if source.kind!='dispatch')
     for source in sources:
-        for stream in (('events','control_events','reconciliations') if source.kind=='dispatch' else ('changes',)):
+        for stream in streams[source.kind]:
             for iteration in range(2):
                 child=subprocess.run([sys.executable,'-B','-m','tools.m0_manager','sync','--binding',str(trusted)],
                     input=canonical({'source_id':source.source_id,'stream':stream}),cwd=ROOT,
                     capture_output=True,timeout=30)
                 result=json.loads(child.stdout)
-                assert child.returncode==0 and result['ok'],result
+                assert child.returncode==0 and result['ok'] and result['result']['state']=='synced',result
                 if iteration:assert result['result']['added']==0,result
+                elif stream=='content_events':assert content_count>0 and result['result']['added']==content_count,result
                 calls.append({'source_id':source.source_id,'stream':stream,'iteration':iteration,'response':result})
+    assert sources_before==snapshot(source.locator for source in sources if source.kind!='dispatch')
     write(work/'sync-results.json',calls)
-    return {'calls':len(calls),'replay_added':0,'streams':['events','control_events','reconciliations','changes'],
-            'content_events_collected':False,'signalhub':'snapshot_only'}
+    return {'calls':len(calls),'replay_added':0,'streams':['events','control_events','reconciliations','changes','content_events'],
+            'content_events_collected':True,'content_events_added':content_count,'sources_unchanged':True,'signalhub':'snapshot_only'}
+
+
+def verify_event_readback(work,manager,binding,script_task,content_count):
+    def cli(op,**args):
+        child=subprocess.run([sys.executable,'-B','-m','tools.m0_manager','--binding',str(manager)],
+            input=canonical({'op':op,'role':'manager','args':args}),cwd=ROOT,capture_output=True,timeout=30)
+        result=json.loads(child.stdout)
+        assert child.returncode==0 and result['ok'],result
+        return result
+
+    paths=[work/'ledger.sqlite3',binding.content_path,*binding.research.catalog_root.glob('*.sqlite3')]
+    before=snapshot(paths)
+    feed=cli('events.query',source_id='workflow-dispatch',limit=200)
+    namespace=f'workflow-content@{binding.content_instance}:e1'
+    events=[item for item in feed['items'] if item['source']==namespace]
+    assert len(events)==content_count and all(item['task_id'] is None and item['attempt_epoch'] is None for item in events)
+    traces={trace:cli('trace.get',source_id='workflow-content',trace_id=trace) for trace in binding.allowed_traces}
+    dispatch=cli('trace.get',source_id='workflow-dispatch',task_id=script_task['task_id'])
+    assert dispatch['events'] and all(event['task_id']==script_task['task_id'] for event in dispatch['events'])
+    with closing(sqlite3.connect((work/'ledger.sqlite3').as_uri()+'?mode=ro',uri=True)) as db:
+        projected=db.execute('SELECT source_id,trace_id,refs_json FROM unified_events WHERE source=?',(namespace,)).fetchall()
+    native={(item['seq'],trace):item['refs'] for trace,result in traces.items() for item in result['items']
+            if item.get('record_type')=='content_event'}
+    assert len(native)==len(projected)==len(events)
+    assert all(native[int(key.split(':')[1]),trace]==json.loads(refs) for key,trace,refs in projected)
+    assert all(sum(item['trace_id']==trace for item in events)==sum(key[1]==trace for key in native) for trace in traces)
+    assert snapshot(paths)==before,'Manager event reads changed a database or sidecar'
+    write(work/'events-after-sync.json',feed)
+    write(work/'content-traces-after-sync.json',traces)
+    write(work/'dispatch-trace-after-sync.json',dispatch)
+    return {'read_cli_calls':2+len(traces),'unified_content_events':len(events),'source_content_traces':len(traces),
+            'dispatch_task_trace_events':len(dispatch['events']),'source_trace_task_join':False,'source_refs_match':True}
 
 
 def run(work):
@@ -242,9 +281,7 @@ def run(work):
     refused=commands.execute(stale_assemble,expected='failed')
     assert refused['result']['commit_state']=='rolled_back',refused
     synced=sync_events(work,binding)
-    event_state=manager_query({'op':'events.query','role':'manager','args':{'source_id':'workflow-dispatch','limit':200}},manager)
-    assert event_state['items']
-    write(work/'events-after-sync.json',event_state)
+    event_readback=verify_event_readback(work,manager,binding,script_task,synced['content_events_added'])
     # Follow fixed lineage directly; no prebuilt fixture chain participated.
     with closing(sqlite3.connect(binding.content_path.as_uri()+'?mode=ro',uri=True)) as db:
         db.row_factory=sqlite3.Row
@@ -260,7 +297,7 @@ def run(work):
             'workflow_binding':binding.digest,'context':context,'script':script,'approval':approved,
             'approval_decision':approval_decision,'approval_before':current,'approval_after':stale,
             'revocation':revocation,'reconciliation_after_revoke':reconciliation,
-            'rollback':rollback,'old_approval_stays_revoked_after_rollback':True,'event_sync':synced,
+            'rollback':rollback,'old_approval_stays_revoked_after_rollback':True,'event_sync':synced,'event_readback':event_readback,
             'source_refs':selected,'manager_readonly_unchanged':True,'a4_observed':True,'a12_observed':True,
             'same_script_alias_no_new_version':True,'unknown_reconciled_without_replay':True,
             'content_counts':counts(binding.content_path,['artifacts','approvals','content_events','operation_receipts']),
