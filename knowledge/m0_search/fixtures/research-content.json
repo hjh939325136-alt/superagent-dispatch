@@ -1,0 +1,8 @@
+[
+  {"id":"sample-clip-method","version":2,"title":"内容工作流的剪辑返工方法","body":"合成内容调研样本。剪辑开始之前登记镜头顺序，避免反复返工。","class":"public","source_ref":"fixture:research-content/sample-clip-method","observed_at":"2026-11-12","expires_at":"2027-11-12","state":"current","human_reviewed":true,"human_locked":true},
+  {"id":"sample-revoked","version":1,"title":"合成撤回排除标记","body":"剪辑返工，REVOKED_FIXTURE_SENTINEL。","class":"public","source_ref":"fixture:research-content/sample-revoked","observed_at":"2026-11-13","expires_at":null,"state":"revoked","human_reviewed":false},
+  {"id":"sample-expired","version":1,"title":"旧版剪辑返工建议","body":"合成已过期方法，保留供检索。","class":"internal","source_ref":"fixture:research-content/sample-expired","observed_at":"2026-09-01","expires_at":"2026-11-10","state":"expired","human_reviewed":true},
+  {"id":"sample-unreviewed","version":1,"title":"剪辑返工未审样本","body":"UNREVIEWED_FIXTURE_SENTINEL","class":"public","source_ref":"fixture:research-content/sample-unreviewed","observed_at":"2026-11-14","expires_at":null,"state":"current","human_reviewed":false},
+  {"id":"sample-restricted","version":1,"title":"内容域密级边界","body":"合成密级控制样本。","class":"restricted","source_ref":"fixture:research-content/sample-restricted","observed_at":"2026-11-14","expires_at":null,"state":"current","human_reviewed":true},
+  {"id":"sample-future","version":1,"title":"未来观察的剪辑返工","body":"合成未来日期标记。","class":"public","source_ref":"fixture:research-content/sample-future","observed_at":"2026-12-01","expires_at":null,"state":"current","human_reviewed":false}
+]

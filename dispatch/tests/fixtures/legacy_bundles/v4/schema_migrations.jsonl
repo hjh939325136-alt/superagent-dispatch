@@ -1,0 +1,3 @@
+{"applied_at":"2026-01-01T00:00:00.000000+00:00","name":"m0_scheduler_events_reconciliation","version":"0007"}
+{"applied_at":"2026-01-01T00:00:00.000000+00:00","name":"m0_control_host_adapter","version":"0008"}
+{"applied_at":"2026-01-01T00:00:00.000000+00:00","name":"m0_claude_owned_runtime","version":"0009"}

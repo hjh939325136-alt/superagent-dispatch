@@ -1,0 +1,6 @@
+[
+  {"id":"dy:synthetic-reference-01","version":1,"title":"合成参考作品的剪辑返工摘要","body":"仅为合成SignalHub引用摘要：镜头切点与返工记录。无视频、转写或业务正文。","class":"public","source_ref":"fixture:signalhub/reference-01","observed_at":"2026-11-12","expires_at":null,"state":"current","human_reviewed":true},
+  {"id":"dy:synthetic-reference-02","version":2,"title":"合成剪辑返工参考方法","body":"仅为合成参考摘要：发布前核对切点。","class":"internal","source_ref":"fixture:signalhub/reference-02","observed_at":"2026-11-11","expires_at":"2027-01-01","state":"current","human_reviewed":true},
+  {"id":"dy:synthetic-restricted","version":1,"title":"合成受限参考","body":"剪辑返工 SIGNALHUB_RESTRICTED_SENTINEL","class":"restricted","source_ref":"fixture:signalhub/restricted","observed_at":"2026-11-13","expires_at":null,"state":"current","human_reviewed":true},
+  {"id":"dy:synthetic-revoked","version":1,"title":"合成撤回参考","body":"剪辑返工 SIGNALHUB_REVOKED_SENTINEL","class":"public","source_ref":"fixture:signalhub/revoked","observed_at":"2026-11-13","expires_at":null,"state":"revoked","human_reviewed":true}
+]

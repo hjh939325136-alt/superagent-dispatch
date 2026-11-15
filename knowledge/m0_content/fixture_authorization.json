@@ -1,0 +1,10 @@
+{
+  "grant_id": "m0-content-contract-fixture-v1",
+  "kind": "synthetic_fixture",
+  "actor": "synthetic-fixture-not-human",
+  "authorization_source": "fixture://m0-content/contract-test-specification-v1",
+  "purpose": "Exercise version-bound approvals in an isolated synthetic database",
+  "human_reviewed": false,
+  "business_approval": false,
+  "publish_authorized": false
+}

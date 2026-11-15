@@ -1,0 +1,9 @@
+{
+  "q": "剪辑 返工",
+  "domains": ["research-scatter", "research-content"],
+  "caller": {"agent": "fixture-agent", "task_id": "fixture-task", "purpose": "fixture-review"},
+  "scopes": ["research:read"],
+  "max_class": "internal",
+  "as_of": "2026-11-15T00:00:00+08:00",
+  "limit": 10
+}

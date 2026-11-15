@@ -1,0 +1,21 @@
+{
+  "fixture-both": {
+    "caller": {"agent": "fixture-agent", "task_id": "fixture-task", "purpose": "fixture-review"},
+    "domains": ["research-scatter", "research-content"],
+    "max_class": "internal",
+    "scopes": ["research:read"]
+  },
+  "fixture-content-only": {
+    "caller": {"agent": "fixture-agent", "task_id": "fixture-content-task", "purpose": "fixture-review"},
+    "domains": ["research-content"],
+    "max_class": "public",
+    "scopes": ["research:read"]
+  },
+  "fixture-three-source": {
+    "caller": {"agent": "fixture-agent", "task_id": "fixture-three-source-task", "purpose": "fixture-review"},
+    "role": "agent_reader",
+    "domains": ["research-scatter", "research-content", "signalhub"],
+    "max_class": "internal",
+    "scopes": ["research:read", "signalhub:refs"]
+  }
+}

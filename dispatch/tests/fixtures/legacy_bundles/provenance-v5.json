@@ -1,0 +1,29 @@
+{
+  "fixture_files": {
+    "claude_attempts.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "component_capabilities.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_approvals.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_budgets.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_events.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_handoffs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_reservations.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "control_task_rules.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "events.jsonl": "44051dd88b1c10e54c47857db9a25af345778f750a935b8d90acb82e2850af8a",
+    "evidence.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "host_attempts.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "host_events.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "late_results.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "leases.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "manifest.json": "d7d515a073157b5ce0d5c2259f9dc78f465f16b2099cc165379b79bd0ad7cb38",
+    "reconciliations.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "schedule_events.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "schedule_firings.jsonl": "755781ffabcd10af8294943faae377cdd8e9daa20951fb9d18bbc3d3dfcfd57d",
+    "schedules.jsonl": "de0b47eebffbac88ccd1b9d8611c2a90912deaf5886d23c814c8fa04a1209d39",
+    "schema_migrations.jsonl": "7266e49e272a90a0f08b96008f38cdfb7b80df324670e0719c740b2c5562f27d",
+    "tasks.jsonl": "6fe4331f0c15e6ef39abdbcab2d94e2f2b97e30851f50f20df8ed421aca9351a",
+    "transport_artifact_grants.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "transport_handoffs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unified_events.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_archive_sha256": "e9611a468dc51001eb35f1acbf8848d70b9644efcef2c01078f0926e288ae298"
+}

@@ -1,0 +1,9 @@
+{"actor":"submit","at":"2026-11-15T04:53:28.396248+00:00","fence":0,"from_status":null,"reason":"submitted","seq":1,"task_id":"t_73d3be19fce443c59e18e78c9c1b4fb4","to_status":"queued"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.396880+00:00","fence":1,"from_status":"queued","reason":"claimed","seq":2,"task_id":"t_73d3be19fce443c59e18e78c9c1b4fb4","to_status":"leased"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.431019+00:00","fence":1,"from_status":"leased","reason":"completed","seq":3,"task_id":"t_73d3be19fce443c59e18e78c9c1b4fb4","to_status":"succeeded"}
+{"actor":"submit","at":"2026-11-15T04:53:28.432342+00:00","fence":0,"from_status":null,"reason":"submitted","seq":4,"task_id":"t_0e61013153d84cb4a83c7f5e63190d50","to_status":"queued"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.433428+00:00","fence":1,"from_status":"queued","reason":"claimed","seq":5,"task_id":"t_0e61013153d84cb4a83c7f5e63190d50","to_status":"leased"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.467244+00:00","fence":1,"from_status":"leased","reason":"completed","seq":6,"task_id":"t_0e61013153d84cb4a83c7f5e63190d50","to_status":"succeeded"}
+{"actor":"submit","at":"2026-11-15T04:53:28.468328+00:00","fence":0,"from_status":null,"reason":"submitted","seq":7,"task_id":"t_159760c24a7a478c90a6c8f1c1de420a","to_status":"queued"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.469011+00:00","fence":1,"from_status":"queued","reason":"claimed","seq":8,"task_id":"t_159760c24a7a478c90a6c8f1c1de420a","to_status":"leased"}
+{"actor":"fixture-one","at":"2026-11-15T04:53:28.502572+00:00","fence":1,"from_status":"leased","reason":"completed","seq":9,"task_id":"t_159760c24a7a478c90a6c8f1c1de420a","to_status":"succeeded"}

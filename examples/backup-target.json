@@ -1,0 +1,8 @@
+{
+  "schema": "m0.portable_backup_target.v1",
+  "target_root": "REPLACE_WITH_DEDICATED_ABSOLUTE_TARGET_DIRECTORY",
+  "quota_bytes": 209715200,
+  "target_device": 0,
+  "target_inode": 0,
+  "pwsh": "REPLACE_WITH_TRUSTED_ABSOLUTE_PWSH_EXE_ON_WINDOWS_OR_NULL_ON_LINUX"
+}

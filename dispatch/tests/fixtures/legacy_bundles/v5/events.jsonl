@@ -1,0 +1,2 @@
+{"actor":"submit","at":"2026-01-01T00:00:00.000000+00:00","fence":0,"from_status":null,"reason":"submitted","seq":1,"task_id":"t_6b9eda5537734128b91c5c0792fa0229","to_status":"queued"}
+{"actor":"fixture","at":"2026-01-01T00:00:00.000000+00:00","fence":0,"from_status":"queued","reason":"cancelled","seq":2,"task_id":"t_6b9eda5537734128b91c5c0792fa0229","to_status":"cancelled"}

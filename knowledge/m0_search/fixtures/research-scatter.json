@@ -1,0 +1,9 @@
+[
+  {"id":"sample-notes","version":1,"title":"剪辑返工研究笔记","body":"合成调研样本。剪辑前先核对证据，再记录返工时间。","class":"internal","source_ref":"fixture:research-scatter/sample-notes","observed_at":"2026-11-10","expires_at":null,"state":"current","human_reviewed":true,"human_locked":true},
+  {"id":"sample-restricted","version":1,"title":"合成密级排除标记","body":"剪辑返工，RESTRICTED_FIXTURE_SENTINEL。","class":"restricted","source_ref":"fixture:research-scatter/sample-restricted","observed_at":"2026-11-13","expires_at":null,"state":"current","human_reviewed":false},
+  {"id":"sample-archived","version":1,"title":"合成归档标记","body":"剪辑返工，ARCHIVED_FIXTURE_SENTINEL。","class":"public","source_ref":"fixture:research-scatter/sample-archived","observed_at":"2026-10-13","expires_at":null,"state":"archived","human_reviewed":true},
+  {"id":"sample-out-of-scope","version":1,"title":"剪辑返工超范围样本","body":"SCOPE_FIXTURE_SENTINEL","class":"public","required_scope":"research:limited","source_ref":"fixture:research-scatter/sample-out-of-scope","observed_at":"2026-11-13","expires_at":null,"state":"current","human_reviewed":true},
+  {"id":"sample-expired","version":1,"title":"旧实验记录","body":"合成过期控制样本。","class":"internal","source_ref":"fixture:research-scatter/sample-expired","observed_at":"2026-09-10","expires_at":"2026-10-10","state":"expired","human_reviewed":true},
+  {"id":"sample-revoked","version":1,"title":"已撤销实验记录","body":"合成撤销控制样本。","class":"internal","source_ref":"fixture:research-scatter/sample-revoked","observed_at":"2026-10-10","expires_at":null,"state":"revoked","human_reviewed":true},
+  {"id":"sample-deleted","version":1,"title":"剪辑返工删除样本","body":"DELETED_FIXTURE_SENTINEL","class":"public","source_ref":"fixture:research-scatter/sample-deleted","observed_at":"2026-10-10","expires_at":null,"state":"deleted","human_reviewed":true}
+]

@@ -1,37 +1,33 @@
-# SuperAgent Dispatch
+# SuperAgent M0 source candidate
 
-SuperAgent Dispatch is a Python task coordinator for projects with multiple tools or execution devices. It keeps a SQLite ledger of versioned tasks, capability matching, leases, idempotency keys, and SHA-256 evidence. A content-operations adapter and small synthetic fixtures show how a project can integrate its own tool.
+Requires Python 3.11 or later with SQLite and the standard library. Use `python3` or `py -3.11` if your installation uses that name. Use fresh output directories on a local filesystem. The fixture launchers generate local bindings based on their output directory and the selected Python executable.
 
-## Run from source
+## Synthetic acceptance
 
-Use Python 3.11 or later from the checkout root. The runtime uses only the Python standard library.
+From the directory containing the candidate, replace `SuperAgent M0` with the extracted directory name. The sibling output directories keep generated data out of the source tree.
 
 ```sh
-python -B -m sa_dispatch selftest
-python -B -m unittest discover -s tests -v
+python -B "SuperAgent M0/superagent.py" manager-fixture --output "M0 manager fixture"
+python -B "SuperAgent M0/superagent.py" manager --binding "M0 manager fixture/manager-binding.json" < "SuperAgent M0/examples/manager-query.json"
+python -B "SuperAgent M0/superagent.py" pipeline-fixture --output "M0 pipeline fixture"
 ```
 
-The self-test creates a separate temporary ledger, runs three synthetic jobs, exports completed task history, and confirms the new ledger can read the same receipts without replaying component calls. The tests also exercise the foreground coordinator, authorization, and process restart.
+For the Manager request in PowerShell, use `Get-Content -Raw "SuperAgent M0/examples/manager-query.json" | python -B "SuperAgent M0/superagent.py" manager --binding "M0 manager fixture/manager-binding.json"` with a UTF-8 pipeline. The pipeline fixture invokes the normal content Dispatcher CLI, reads back pinned research references, and verifies script lineage, approval state, and revocation in `report.json`. The toy script and approval have no human review or publication authority. Bindings contain machine-local absolute paths and must be generated again when relocating. When supplying absolute output or binding paths, omit parent-traversal segments such as `..`.
 
-## Deploy a synthetic coordinator
+## Entrypoints
 
-The foreground service runs on IPv4 loopback. Its dedicated ledger serves synthetic tasks and fixtures only. The [Linux deployment guide](deploy/README.md) covers setup on a systemd host, generating separate dispatcher and worker credentials, a smoke check across service restart, and offline backup verification.
+`dispatch selftest` exercises the separate synthetic Dispatcher bundle round trip. `research-search --help`, `research-binding --help`, and `content-contract --help` describe direct fixture operations. `research --config PATH` and `content --config PATH` register local components on the Dispatcher, and the pipeline fixture produces a working example TOML. `manager --binding PATH` consumes one JSON request on stdin. Its role fields are trusted-local selectors and provide no authentication. Use trusted local code, configuration and bindings. `manager sync` and `manager adopt` are explicit operator actions with separate bindings.
 
-The source CLI and synthetic tests are portable. Linux systemd deployment has a separate checklist. Use a local filesystem for the SQLite ledger, with one coordinator per ledger. Keep real project data, component credentials, and live configuration in the systems that own them. Host identities and fixture credentials are operator configuration, separate from released code.
+`retention init-fixture --new-root PATH` prepares a synthetic binding. `retention --binding PATH plan` produces a plan, and `apply-fixture` and `recover-fixture` require an isolated synthetic fixture and its fixture grant. `inventory --help` describes explicit JSON inventory projections. `tools.m0_storage.target` supplies the local storage API used by Manager.
 
-## Project structure
+## Bound synthetic backup
 
-| Directory | Contents |
-| --- | --- |
-| `sa_dispatch/` | Ledger, task contracts, artifact store, CLI and synthetic transport |
-| `sa_dispatch_hotspot/` | Example content-operations adapter |
-| `deploy/` | Linux service, deployment checks, backup verification, and synthetic smoke client |
-| `tests/` | Regression tests and source-based fixture |
+Create a protected, operator-maintained copy of `examples/backup-target.json` outside the source tree. Fill in the existing dedicated absolute target directory, a byte quota at or below 209,715,200, and the directory's `st_dev` and `st_ino` from `os.stat`. Use a trusted absolute `pwsh.exe` on Windows and JSON `null` on Linux. Keep the binding under the same local operator trust as the Python launcher and executable. The binding is local configuration, with no cross-user authentication or permission isolation. Re-enroll it when the target directory or host changes.
 
-The release scope is single-host coordination and synthetic handoff. Real-device access, data transfer for live business tasks, and host reboot recovery have separate deployment acceptance criteria.
+Run `python -B superagent.py bound-backup preflight --binding BINDING --plan PLAN` to validate a synthetic allowlist and physical separation before writes. Run the same command with `backup` in place of `preflight` to write the verified archive. Only the binding supplies target location and quota. Plans use `m0.synthetic_backup_plan.v1` with `synthetic_only`, an absolute `source_root`, a unique `op_id`, and a `files` array of relative `path` and `kind` pairs. Linux also requires the library's `linux_devices` declaration, whose identities are checked against the local devices. Restore to a new test directory with `python -B superagent.py backup restore --archive ARCHIVE --target-root NEW_DIRECTORY`; Linux additionally requires `--expected-target-st-dev`. The legacy Windows CLI's direct backup and preflight route remains closed in this candidate. Use `bound-backup` for Windows backup and preflight.
 
-## Use a project adapter
+## Coordinator deployment files
 
-Create a Python entry point that invokes `sa_dispatch.cli.main(plugins={"my-project": KINDS})`, with a mapping from task kind names to trusted adapter objects. Set `plugins = ["my-project"]` in your TOML and configure the corresponding component executable there. A task kind provides `name`, `version`, `enabled`, `side_effect`, `component`, `validate(params)`, `scope(params)`, `request(task)`, and `result(response, task)`. Its optional `allow_no_new` defaults to false. The [included adapter](sa_dispatch_hotspot/__init__.py) shows the request and response shape. The worker gives the configured executable a generated JSON request file and expects a JSON response with the original `request_id`. Test task validation, response binding and duplicate requests using synthetic fixtures before using a component on real records.
+`dispatch/deploy/` contains the Linux systemd installer, source check, synthetic state backup and verifier, smoke client, service unit and configuration templates. The source check discovers the included Dispatcher tests and runs its synthetic self-test. The identities example uses placeholders. See `dispatch/deploy/README.md` for target-host steps. This candidate check does not install or start the service.
 
-For the local executor, the request includes `idempotency_key`, which can be null for reads. Synthetic reconciliation uses the included fixture's `fake.write.get` contract. Other write adapters can leave uncertain results in `unknown` until their operator has enough evidence to reconcile them.
+This source snapshot covers the packaged M0 modules, synthetic fixtures, and launchers. It carries no deployed configuration, live bindings, service data, or operating history. This checkpoint does not establish 24-hour operation, real-data acceptance, cross-device execution, or production deployment. `SOURCE_PROVENANCE.json` records source and staged hashes, including the Windows backup path adjustments. `SHA256SUMS` covers every staged file other than the manifest itself. See `LICENSE` for the MIT terms.
