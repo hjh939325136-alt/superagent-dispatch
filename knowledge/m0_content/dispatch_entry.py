@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import sqlite3
 import sys
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -11,12 +12,15 @@ for item in (ROOT,ROOT/'dispatch',ROOT/'knowledge/m0_search'):
     if str(item) not in sys.path:sys.path.insert(0,str(item))
 from sa_dispatch.cli import main as dispatch_main
 from sa_dispatch.config import load_config
-from sa_dispatch.models import Outcome
+from sa_dispatch.models import DispatchError,Outcome
 from sa_dispatch.executor import receipt_bytes
 from sa_dispatch.canonical import sha256_ref
 from sa_dispatch.invocation import (WORKFLOW_PARAMS as PARAMS, WORKFLOW_PROFILE, WORKFLOW_WRITES as WRITES,
                                     same, workflow_request)
 from knowledge.m0_content.workflow_binding import WorkflowError,load_workflow_binding,search_modules,request_base
+from knowledge.m0_content.recovery_dispatch import run_recovery_dispatch
+from tools.m0_backup.domain_binding import check_recovery_binding_current,require_recovery_operation
+from tools.m0_manager.readonly import SourceError
 
 OPERATIONS=set(PARAMS)
 
@@ -26,6 +30,7 @@ def validate_params(binding,operation,params,*,invocation=False):
     if invocation and operation=='content.approval_record':fields=fields|{'control_approval'}
     if operation not in OPERATIONS or not isinstance(params,dict) or set(params)!=fields:
         raise WorkflowError('INVALID_WORKFLOW_FIELDS')
+    require_recovery_operation(binding,operation)
     if params['workflow_binding']!=binding.digest:
         raise WorkflowError('WORKFLOW_BINDING_CHANGED')
     clean={k:v for k,v in params.items() if k!='workflow_binding'}
@@ -130,6 +135,8 @@ class WorkflowKind:
         return data
     def lookup_request(self,task,original,request_hash):
         if self.name not in WRITES:raise WorkflowError('READ_OPERATION_NOT_RECONCILABLE')
+        require_recovery_operation(self.binding,'operation.lookup',task.task_id)
+        check_recovery_binding_current(self.binding,'workflow')
         return {'schema_version':'0.1','request_id':'reconcile-'+task.task_id,'operation':'operation.lookup',
                 'idempotency_key':None,'payload':{'task_id':task.task_id,'fence':task.fence,
                   'operation':original['operation'],'write_key':original['idempotency_key'],'request_hash':request_hash,
@@ -138,6 +145,8 @@ class WorkflowKind:
         return {'binding_hash':self.binding.digest,'catalog_instance':self.binding.research.instance,
                 'content_instance':self.binding.content_instance}
     def validate_lookup(self,task,original,data):
+        require_recovery_operation(self.binding,'operation.lookup',task.task_id)
+        check_recovery_binding_current(self.binding,'workflow')
         if any(data.get(k)!=v for k,v in self.instance().items()):
             raise WorkflowError('LOOKUP_INSTANCE_MISMATCH')
         return True
@@ -176,6 +185,9 @@ def configured(config):
     research=module.configured_kinds(config)
     if any(getattr(kind,'binding',None) is None or kind.binding.digest!=binding.research.digest for kind in research.values()):
         raise WorkflowError('RESEARCH_COMPONENT_BINDING_MISMATCH')
+    if any(kind.binding.recovery_digest!=binding.recovery_digest or
+           binding.recovery_digest is not None and kind.binding.path!=binding.research.path for kind in research.values()):
+        raise WorkflowError('RECOVERY_RESEARCH_BINDING_MISMATCH')
     return {'research':research,'research_content':{name:WorkflowKind(name,binding) for name in OPERATIONS}}
 
 
@@ -183,10 +195,16 @@ def main(argv=None):
     argv=sys.argv[1:] if argv is None else argv
     parser=argparse.ArgumentParser(add_help=False);parser.add_argument('--config',type=Path,required=True)
     try:
-        selected,_=parser.parse_known_args(argv)
+        selected,args=parser.parse_known_args(argv)
         config=load_config(selected.config,allowed_plugins={'research','research_content'})
-        return dispatch_main(argv,plugins=configured(config))
-    except (ValueError,OSError,TypeError,KeyError) as error:
+        plugins=configured(config)
+        binding=next(iter(plugins['research_content'].values())).binding
+        if binding.recovery_digest is not None:
+            data=run_recovery_dispatch(config,plugins,binding,'workflow',args)
+            print(json.dumps({'schema':'sa_dispatch.v0','ok':True,'data':data}))
+            return 0
+        return dispatch_main(argv,plugins=plugins)
+    except (ValueError,OSError,TypeError,KeyError,DispatchError,SourceError,sqlite3.Error) as error:
         print(json.dumps({'schema':'sa_dispatch.v0','ok':False,'error':{'code':getattr(error,'code','WORKFLOW_REFUSED')}}))
         return 2
 

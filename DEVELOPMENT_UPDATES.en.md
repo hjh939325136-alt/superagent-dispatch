@@ -49,3 +49,11 @@ The local mixed workflow can now confirm the historical result of an uncertain w
 - Supported research-to-content writes record the original request before invocation. Historical approval and component results can be checked without the original journal. Later withdrawal or denial still applies, and the lookup never replays the write.
 - Use 0.1.1-m0.6 or a later compatible implementation to export, verify, and import these bundles. Earlier v7 tools can omit supporting evidence and still report a pass. Stop old writers, keep writer versions separate, and avoid in-place downgrades.
 - Validation covers trusted local synthetic workflows. Cross-machine rebinding, central control, and upgrades to the running service still need validation.
+
+## 0.1.1-m0.7 (2026-11-15)
+
+An offline synthetic workspace can now be restored to a new location while preserving its original tasks, bindings, and evidence.
+
+- The checkpoint preserves research, content, the ledger, and known evidence. Use an owned, stopped source and a new destination. Ordinary v7 still rejects unknown tasks.
+- Historical access is read-only by default. An explicit rehearsal can check only listed historical tasks and never reruns the write. Original identity, held usage, and revocations captured in the snapshot are preserved.
+- A checkpoint created on Windows was restored in isolated Debian. Later revocations remain unverified. Live backup, real data, and continuous operation still need validation.

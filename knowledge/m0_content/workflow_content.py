@@ -13,6 +13,7 @@ import sqlite3
 from knowledge.m0_content.contract import Contract, ContractError, canonical, digest, parse_ref, timestamp, ulid
 from knowledge.m0_content.workflow_binding import WorkflowBinding, WorkflowError
 from knowledge.m0_content.workflow_guard import WorkflowGuard, require_guard
+from tools.m0_backup.domain_binding import check_recovery_binding_current, lookup_task_id, require_recovery_operation
 from tools.m0_manager.readonly import local_sqlite_file, readonly_db
 
 SCHEMA = 'm0.research_content_workflow.v1'
@@ -133,7 +134,8 @@ def _key(write_key, request_hash):
 
 def _guard_identity(binding, guard):
     if (not isinstance(guard, WorkflowGuard) or not guard.active or
-            guard.binding.digest != binding.digest or guard.binding.content_instance != binding.content_instance):
+            guard.binding.digest != binding.digest or guard.binding.content_instance != binding.content_instance or
+            guard.binding.recovery_digest != binding.recovery_digest):
         _fail('DEPENDENCY_GUARD_REQUIRED')
 
 
@@ -257,6 +259,7 @@ def _control_expiry(params, at):
 
 
 def write_content(binding, operation, params, write_key, request_hash, guard, *, committed_fence=None):
+    require_recovery_operation(binding, operation)
     params = _normalize(binding, operation, params)
     if operation not in WRITES:
         _fail('CONTENT_OPERATION_NOT_WRITABLE')
@@ -338,7 +341,9 @@ def _read_view(binding, guard):
     """
     if not isinstance(binding, WorkflowBinding):
         _fail('INVALID_WORKFLOW_BINDING')
-    with readonly_db(_path(binding.content_path)) as db:
+    recovered = check_recovery_binding_current(binding, 'workflow')
+    identity = recovered.file_identities['content.sqlite3'] if recovered is not None else None
+    with readonly_db(_path(binding.content_path), identity=identity) as db:
         _meta(db, binding)
         reader = object.__new__(Contract)
         reader.path, reader.db, reader.dependency_guard = binding.content_path, db, guard
@@ -349,6 +354,7 @@ def lookup_content(binding, operation, write_key, request_hash, guard=None):
     if operation not in WRITES:
         _fail('INVALID_CONTENT_OPERATION')
     _key(write_key, request_hash)
+    require_recovery_operation(binding, 'operation.lookup', lookup_task_id(operation, write_key))
     if guard is not None:
         _guard_identity(binding, guard)
     with _read_view(binding, guard) as content:
@@ -383,7 +389,8 @@ def approval_status(binding, params, guard):
             _fail('SCRIPT_CONTEXT_MISMATCH')
         result = {'script_ref': script['ref'], 'approval_ref': approval['ref'], 'version_bound': script['version']}
         current = _usability(content, result)
+        provenance = binding.recovery_admission.provenance() if binding.recovery_admission is not None else {}
         return {**result, 'context_id': params['context_id'], 'manifest_sha256': params['manifest_sha256'],
                 'workflow_binding': binding.digest, 'content_instance': binding.content_instance,
-                **current, 'usable': current['current_usable'], 'synthetic_only': True,
+                **current, **provenance, 'usable': current['current_usable'], 'synthetic_only': True,
                 'human_reviewed': False, 'publish_authorized': False, 'platform_calls': 0}

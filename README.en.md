@@ -43,6 +43,8 @@ Mixed mode can bind approvals and settle synthetic usage per task. For a support
 
 **Use `0.1.1-m0.6` or a later compatible build for export, verification, and import of these evidence bundles.** Earlier v7 tools can omit supporting evidence. See [historical reconciliation and tool compatibility](M0_PREVIEW.en.md#historical-reconciliation-and-tool-compatibility).
 
+This preview can also restore an owned, stopped synthetic workspace to a new directory while preserving its original task identities. Restored data is read-only by default. An explicit rehearsal can check listed historical tasks and cannot run them again. Try the [offline recovery demo](tools/m0_backup/README.md#offline-synthetic-recovery) in a temporary workspace.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

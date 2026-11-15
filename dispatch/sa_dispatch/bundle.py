@@ -162,6 +162,10 @@ def portable(records, *, include_fixed_refs=True):
         raise ArtifactError("E_EXPORT_BLOCKED", str(exc)) from exc
     if records["late_results"]:
         raise ArtifactError("E_EXPORT_BLOCKED", "bundles with late receipts require local review")
+    return _artifact_roots(records, include_fixed_refs=include_fixed_refs)
+
+
+def _artifact_roots(records, *, include_fixed_refs):
     hashes = {item["artifact_hash"] for item in records["evidence"] if item["artifact_hash"]}
     for table, field in (("reconciliations", "evidence_ref"), ("component_capabilities", "proof_ref"),
                          ("transport_artifact_grants", "content_hash"),
@@ -190,7 +194,13 @@ def portable(records, *, include_fixed_refs=True):
 
 
 def _artifact_inventory(records, store, *, legacy=False):
-    hashes = set(portable(records,include_fixed_refs=not legacy))
+    roots = portable(records, include_fixed_refs=not legacy)
+    return _known_artifact_inventory(records, store, roots, legacy=legacy)
+
+
+def _known_artifact_inventory(records, store, roots, *, legacy=False):
+    """Follow owned CAS edges after the caller applies its format's admission rules."""
+    hashes = set(roots)
     hashes.update(_invocation_inventory(records, store))
     for row in records.get('route_audit', []):
         ref = row['evidence_ref']

@@ -11,6 +11,13 @@ import os
 from pathlib import Path
 import sqlite3
 import stat
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from tools.m0_backup.domain_binding import (ENVELOPE_SCHEMA, HASH, IDENTITY, RecoveryAdmission,
+    check_recovery_binding_current, historical_path, load_recovery_binding, require_recovery_operation)
 
 from catalog import APPLICATION_ID, Catalog, CatalogError, MARKER, SOURCES, identity, parse_ref
 from fixture_store import canonical_json
@@ -78,9 +85,12 @@ class Binding:
     marker_hash: str
     digest: str
     grant: str = GRANT
+    recovery_digest: str | None = None
+    recovery_admission: RecoveryAdmission | None = None
 
     def catalog(self):
         # Authorization must be checked by the caller before this source preflight.
+        check_recovery_binding_current(self, 'research')
         safe_path(self.catalog_root, directory=True)
         raw = read_file(self.catalog_root / 'catalog.json')
         marker = parse_json(raw)
@@ -105,15 +115,26 @@ class Binding:
 def load_binding(path):
     path = Path(path)
     data = parse_json(read_file(path))
+    recovered = None
+    if isinstance(data, dict) and data.get('schema') == ENVELOPE_SCHEMA:
+        recovered = load_recovery_binding(path, 'research')
+        data = recovered.original
     if (not isinstance(data, dict) or set(data) != FIELDS or data['schema'] != SCHEMA or
             data['synthetic_only'] is not True or data['authorization_source'] != AUTHORITY or
             data['grant_id'] != GRANT or not isinstance(data['catalog_instance'], str) or
             not isinstance(data['catalog_marker_sha256'], str) or len(data['catalog_marker_sha256']) != 64):
         fail('INVALID_BINDING', 'Only the explicit three-source synthetic fixture binding is supported')
+    digest = 'sha256:' + hashlib.sha256(canonical_json(data).encode()).hexdigest()
+    if recovered is not None:
+        if (not historical_path(data['catalog_root']) or not IDENTITY.fullmatch(data['catalog_instance']) or
+                not HASH.fullmatch(data['catalog_marker_sha256'])):
+            fail('INVALID_BINDING', 'Invalid original research binding')
+        return Binding(path, recovered.role_paths['catalog_root'], data['catalog_instance'],
+                       data['catalog_marker_sha256'], digest, recovery_digest=recovered.recovery_digest,
+                       recovery_admission=recovered.admission)
     root = Path(data['catalog_root'])
     if not root.is_absolute() or '..' in root.parts:
         fail('INVALID_BINDING', 'Catalog binding requires an absolute local path')
-    digest = 'sha256:' + hashlib.sha256(canonical_json(data).encode()).hexdigest()
     # Deliberately do not stat/open the catalog before task authorization.
     return Binding(path, root, data['catalog_instance'], data['catalog_marker_sha256'], digest)
 
@@ -143,6 +164,7 @@ def initialize_binding(catalog_root, output):
 def authorize_bound(params, binding, operation, *, submitted=False):
     if operation not in OPERATIONS:
         fail('INVALID_REQUEST', 'Unsupported read operation')
+    require_recovery_operation(binding, operation)
     if not isinstance(params, dict):
         fail('INVALID_REQUEST', 'Request must be an object')
     clean = dict(params)
@@ -167,10 +189,14 @@ def execute_bound(operation, params, binding):
     clean = authorize_bound(params, binding, operation)
     selected = binding.catalog()
     if operation == 'research.search':
-        return search(clean, binding.grant, catalog=selected)
-    if operation == 'research.get':
-        return get(clean, binding.grant, catalog=selected)
-    return selected.context_get(clean, binding.grant, reassemble=operation == 'research.context_reassemble')
+        result = search(clean, binding.grant, catalog=selected)
+    elif operation == 'research.get':
+        result = get(clean, binding.grant, catalog=selected)
+    else:
+        result = selected.context_get(clean, binding.grant, reassemble=operation == 'research.context_reassemble')
+    if binding.recovery_admission is not None:
+        result.update(binding.recovery_admission.provenance())
+    return result
 
 
 def receipt_projection(data, binding):
@@ -209,6 +235,7 @@ def main():
             binding = load_binding(args.binding)
             params = parse_json(read_file(args.request, limit=128 * 1024))
             if args.operation == 'context.assemble':
+                require_recovery_operation(binding, args.operation)
                 authorize(params, binding.grant, 'refs')
                 result = binding.catalog().assemble(params, binding.grant)
             else:

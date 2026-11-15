@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "b81ac69a4a9f9ff684996caab1f65dced28626b9d01ededa4e0802e57fb5fea5"
+    "staged_sha256": "f3a959e5c3c616089d4b119d09dcfa11ae8226da08a8dc14b96deb941aba3087"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5271cb1f0da4a0dc5653013f7911c2f9518ab3e731a728af62ccd82ffb40227e"
+    "staged_sha256": "bdb3dfa02f20585053beefbdcf8a12f053a5be16e4a3582b9220b391c8de212f"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "b6589e349b63bb94c3613e503b76b01e3a10278f7a6fd73f484498b888f0c69c"
+    "staged_sha256": "905e8f6d854d047290a8ae43ffa09325ae67fdf4d11cd9d99b1e323dbe12ab7b"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "cbeaf8a861945d24519f83922651e83547b10c5b7749c0dca305956a6d9b8709"
+    "staged_sha256": "89edf67a47a22d8b6896c9d0865a74b9e7661936807e8083fa368d9f77c65faf"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -91,8 +91,8 @@
   },
   "dispatch/sa_dispatch/bundle.py": {
     "source": "dispatch/sa_dispatch/bundle.py",
-    "source_sha256": "63b27c43d547d349053c92608eee891db90309a3f1ca4b5e8de777dd546c6513",
-    "staged_sha256": "63b27c43d547d349053c92608eee891db90309a3f1ca4b5e8de777dd546c6513"
+    "source_sha256": "20cda52ffd210cdb58b10a5e32c02046d531dc06e8be27a20466dd72e75f569d",
+    "staged_sha256": "20cda52ffd210cdb58b10a5e32c02046d531dc06e8be27a20466dd72e75f569d"
   },
   "dispatch/sa_dispatch/canonical.py": {
     "source": "dispatch/sa_dispatch/canonical.py",
@@ -921,13 +921,13 @@
   },
   "knowledge/m0_content/dispatch_component.py": {
     "source": "knowledge/m0_content/dispatch_component.py",
-    "source_sha256": "edf5f98671d230103d5e88c42cb5c3d8ad95c9afef446b3027cefd709495a219",
-    "staged_sha256": "edf5f98671d230103d5e88c42cb5c3d8ad95c9afef446b3027cefd709495a219"
+    "source_sha256": "8214357db62093b9817d8538cdb4b3645813d739fc3f1df9493c387b315fb4e6",
+    "staged_sha256": "8214357db62093b9817d8538cdb4b3645813d739fc3f1df9493c387b315fb4e6"
   },
   "knowledge/m0_content/dispatch_entry.py": {
     "source": "knowledge/m0_content/dispatch_entry.py",
-    "source_sha256": "96aac597f799f5a096fcc6ff26425f4f016585900e127ea0e5a651e4eaa5d2e5",
-    "staged_sha256": "96aac597f799f5a096fcc6ff26425f4f016585900e127ea0e5a651e4eaa5d2e5"
+    "source_sha256": "3bfe06991eb8146a8c246f10c674a9de746b4c27bd4ce99b61fcd30572b53c5f",
+    "staged_sha256": "3bfe06991eb8146a8c246f10c674a9de746b4c27bd4ce99b61fcd30572b53c5f"
   },
   "knowledge/m0_content/fixture_authorization.json": {
     "source": "knowledge/m0_content/fixture_authorization.json",
@@ -939,20 +939,45 @@
     "source_sha256": "9af9f59da0b4ec95e0cbaef76e2220968c61f2235e8e027d3af620f831a2cbaf",
     "staged_sha256": "9af9f59da0b4ec95e0cbaef76e2220968c61f2235e8e027d3af620f831a2cbaf"
   },
+  "knowledge/m0_content/recovery_dispatch.py": {
+    "source": "knowledge/m0_content/recovery_dispatch.py",
+    "source_sha256": "efdf2cc04d3b021b3936bccafea88971622510e9f8ba1c4833cef0b9551fbf7d",
+    "staged_sha256": "efdf2cc04d3b021b3936bccafea88971622510e9f8ba1c4833cef0b9551fbf7d"
+  },
   "knowledge/m0_content/run_research_pipeline_lab.py": {
     "source": "knowledge/m0_content/run_research_pipeline_lab.py",
     "source_sha256": "a91671d924ffbbeee4f06567bed160485a41926082d4fbb1d089fbf221b7f7f1",
     "staged_sha256": "a91671d924ffbbeee4f06567bed160485a41926082d4fbb1d089fbf221b7f7f1"
   },
+  "knowledge/m0_content/test_contract.py": {
+    "source": "knowledge/m0_content/test_contract.py",
+    "source_sha256": "780b93edd6f5e06bd3c95c94447e46a2dfb165d76f54735d0e4b6ad226f25e1d",
+    "staged_sha256": "780b93edd6f5e06bd3c95c94447e46a2dfb165d76f54735d0e4b6ad226f25e1d"
+  },
+  "knowledge/m0_content/test_recovery_binding.py": {
+    "source": "knowledge/m0_content/test_recovery_binding.py",
+    "source_sha256": "4e9742b74d909876ad2b1e80fd6a3f8af42d301f9c0b007958a5d3c8b20655b0",
+    "staged_sha256": "4e9742b74d909876ad2b1e80fd6a3f8af42d301f9c0b007958a5d3c8b20655b0"
+  },
+  "knowledge/m0_content/test_workflow_content.py": {
+    "source": "knowledge/m0_content/test_workflow_content.py",
+    "source_sha256": "c9b4cdbcddc0c6b582dd2907520c77ea46c911e323bb5aa775113cb70d6360cf",
+    "staged_sha256": "c9b4cdbcddc0c6b582dd2907520c77ea46c911e323bb5aa775113cb70d6360cf"
+  },
+  "knowledge/m0_content/test_workflow_entry.py": {
+    "source": "knowledge/m0_content/test_workflow_entry.py",
+    "source_sha256": "db3392b34298b68bf0f4dca70a8ebd1d0d7f7646e49eab7ebd6d49a285af90d4",
+    "staged_sha256": "db3392b34298b68bf0f4dca70a8ebd1d0d7f7646e49eab7ebd6d49a285af90d4"
+  },
   "knowledge/m0_content/workflow_binding.py": {
     "source": "knowledge/m0_content/workflow_binding.py",
-    "source_sha256": "1a096556a8cee779c2777faa00c158d29d272affa9d675ca456b1e1eacb6c2b9",
-    "staged_sha256": "1a096556a8cee779c2777faa00c158d29d272affa9d675ca456b1e1eacb6c2b9"
+    "source_sha256": "1e9cab02b688a378575ae1acb71cef4b4cfcf21da3035cc519186df618f9fcfc",
+    "staged_sha256": "1e9cab02b688a378575ae1acb71cef4b4cfcf21da3035cc519186df618f9fcfc"
   },
   "knowledge/m0_content/workflow_content.py": {
     "source": "knowledge/m0_content/workflow_content.py",
-    "source_sha256": "648cd1eb416de77fb02e02166ed4548d6f0b4dd6daaaf21956ad629b1677b978",
-    "staged_sha256": "648cd1eb416de77fb02e02166ed4548d6f0b4dd6daaaf21956ad629b1677b978"
+    "source_sha256": "ee2589db6ce68652e2ffda93b951ee455aed9015f915f2a8ad3e7de504bb16c5",
+    "staged_sha256": "ee2589db6ce68652e2ffda93b951ee455aed9015f915f2a8ad3e7de504bb16c5"
   },
   "knowledge/m0_content/workflow_guard.py": {
     "source": "knowledge/m0_content/workflow_guard.py",
@@ -966,8 +991,8 @@
   },
   "knowledge/m0_search/dispatch_binding.py": {
     "source": "knowledge/m0_search/dispatch_binding.py",
-    "source_sha256": "6e082b62947eba2656e5aba3fd2e8e5ca16ed63b18f6f81e02307adbb3027a4a",
-    "staged_sha256": "6e082b62947eba2656e5aba3fd2e8e5ca16ed63b18f6f81e02307adbb3027a4a"
+    "source_sha256": "ed8745626aa24221e67ca7ba5b164a318b8bcd99b470edb5797bc43547f7df9c",
+    "staged_sha256": "ed8745626aa24221e67ca7ba5b164a318b8bcd99b470edb5797bc43547f7df9c"
   },
   "knowledge/m0_search/dispatch_component.py": {
     "source": "knowledge/m0_search/dispatch_component.py",
@@ -976,8 +1001,8 @@
   },
   "knowledge/m0_search/dispatch_entry.py": {
     "source": "knowledge/m0_search/dispatch_entry.py",
-    "source_sha256": "39809dc99d675636b39015c26708d6b953b073b4a7bc8c0b5cc76cd8cc804618",
-    "staged_sha256": "39809dc99d675636b39015c26708d6b953b073b4a7bc8c0b5cc76cd8cc804618"
+    "source_sha256": "1eae54dd9f5db7922070d7322f93c37d2e6b53a62bc8bbea7ae50e1ebcfc49f8",
+    "staged_sha256": "1eae54dd9f5db7922070d7322f93c37d2e6b53a62bc8bbea7ae50e1ebcfc49f8"
   },
   "knowledge/m0_search/fixture_store.py": {
     "source": "knowledge/m0_search/fixture_store.py",
@@ -1024,15 +1049,29 @@
     "source_sha256": "4be74079b6495cf64519782ccc95b8bec5e40fa9c2b2af989648ed28f9c56415",
     "staged_sha256": "4be74079b6495cf64519782ccc95b8bec5e40fa9c2b2af989648ed28f9c56415"
   },
+  "knowledge/m0_search/test_search.py": {
+    "source": "knowledge/m0_search/test_search.py",
+    "source_sha256": "d6e4634112c35b8991b7d01c28e953a1f77c515c67ce1972a5f1826dfab0e0dc",
+    "staged_sha256": "d6e4634112c35b8991b7d01c28e953a1f77c515c67ce1972a5f1826dfab0e0dc"
+  },
+  "knowledge/m0_search/test_workflow_catalog.py": {
+    "source": "knowledge/m0_search/test_workflow_catalog.py",
+    "source_sha256": "7023f5942c5105b4108cd2868d100ea736ec77f15d16b8ac13653642862f35f4",
+    "staged_sha256": "7023f5942c5105b4108cd2868d100ea736ec77f15d16b8ac13653642862f35f4"
+  },
   "knowledge/m0_search/workflow_catalog.py": {
     "source": "knowledge/m0_search/workflow_catalog.py",
-    "source_sha256": "b9de0ca79a2b97c59fa8bfe9617ecba794627f9c44db675c1dabb0ec0d230271",
-    "staged_sha256": "b9de0ca79a2b97c59fa8bfe9617ecba794627f9c44db675c1dabb0ec0d230271"
+    "source_sha256": "5d65542876175553915e75da09a0adcadad03318b57c06825a1714949f4f147d",
+    "staged_sha256": "5d65542876175553915e75da09a0adcadad03318b57c06825a1714949f4f147d"
   },
   "superagent.py": {
     "source": "tools/m0_portable/superagent.py",
     "source_sha256": "c800aaf5d7f0b25d1d38f5a05395f38392d7828d4a0c57d0bf205c838bdcdd55",
     "staged_sha256": "c800aaf5d7f0b25d1d38f5a05395f38392d7828d4a0c57d0bf205c838bdcdd55"
+  },
+  "tools/m0_backup/README.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "76106754ad481f086ff59a88a0d600e8b9bbf39074b7ef938aced4ca3606d979"
   },
   "tools/m0_backup/__init__.py": {
     "source": "tools/m0_backup/__init__.py",
@@ -1043,6 +1082,26 @@
     "source": "tools/m0_backup/backup.py",
     "source_sha256": "0db7beaa1ee35c13a71f057936c3891b3d3cae6bdceeb5120f7093f9f3de45e9",
     "staged_sha256": "dcfc6660ebf8febdc7c43a84c1495564b6f5d2273b23f686a8f08b39ed5bf99b"
+  },
+  "tools/m0_backup/domain_binding.py": {
+    "source": "tools/m0_backup/domain_binding.py",
+    "source_sha256": "fbb3250706d5c7f8bcc25d34bef93a154673585a6aef3d782b8f3fd8d4aa6f2b",
+    "staged_sha256": "fbb3250706d5c7f8bcc25d34bef93a154673585a6aef3d782b8f3fd8d4aa6f2b"
+  },
+  "tools/m0_backup/domain_checkpoint.py": {
+    "source": "tools/m0_backup/domain_checkpoint.py",
+    "source_sha256": "0154d041db44188bed0f8e1329d80492b93a4001ab5246ebd98fffdb83cfac85",
+    "staged_sha256": "0154d041db44188bed0f8e1329d80492b93a4001ab5246ebd98fffdb83cfac85"
+  },
+  "tools/m0_backup/run_domain_recovery_lab.py": {
+    "source": "tools/m0_backup/run_domain_recovery_lab.py",
+    "source_sha256": "510c825f9634c4090cb68099d3ff3399fcdab7172a9a5fe170141d3a081f4e48",
+    "staged_sha256": "510c825f9634c4090cb68099d3ff3399fcdab7172a9a5fe170141d3a081f4e48"
+  },
+  "tools/m0_backup/test_domain_checkpoint.py": {
+    "source": "tools/m0_backup/test_domain_checkpoint.py",
+    "source_sha256": "ff5f9b312d1a32dd2ceb1cebb3e86b86a0494599eb62e6c0771c841fce403c03",
+    "staged_sha256": "ff5f9b312d1a32dd2ceb1cebb3e86b86a0494599eb62e6c0771c841fce403c03"
   },
   "tools/m0_inventory/__init__.py": {
     "source": "tools/m0_inventory/__init__.py",

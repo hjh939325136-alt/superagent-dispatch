@@ -17,6 +17,7 @@ from catalog import (ALIASES, APPLICATION_ID, CatalogError, MARKER, OPERATOR, SO
 from dispatch_binding import Binding, GRANT, load_binding, read_file, safe_path
 from fixture_store import record_hash
 from search import CLASSES, SearchError, authorize, result_item, visibility
+from tools.m0_backup.domain_binding import lookup_task_id, require_recovery_operation
 
 OPERATION = 'context.assemble'
 TABLE = 'workflow_operation_receipts'
@@ -137,6 +138,8 @@ def _readonly(action, arg1, arg2, database, trigger):
 
 @contextmanager
 def _transaction(binding, domains=(), *, write=False):
+    if write:
+        require_recovery_operation(binding, OPERATION)
     fresh = load_binding(binding.path)
     if fresh != binding:
         fail('BINDING_CHANGED')
@@ -269,6 +272,7 @@ def assemble(binding, request, write_key, request_hash, *, max_age_s=86400, comm
 
 def lookup(binding, operation, write_key, request_hash):
     _key(operation, write_key, request_hash)
+    require_recovery_operation(binding, 'operation.lookup', lookup_task_id(operation, write_key))
     _lookup_authority(binding)
     with _transaction(binding, SOURCES) as (selected, db):
         _schema(db)

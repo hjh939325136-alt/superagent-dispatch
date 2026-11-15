@@ -42,7 +42,15 @@ Before executing a mixed-mode local task, the system records the original reques
 
 **Use `0.1.1-m0.6` or a later compatible implementation for export, verify, and import.** `0.1.1-m0.5` and earlier v7 tools can omit supporting evidence and still report their own incomplete export as valid. The new verifier rejects missing or mismatched evidence. The v7 label describes the bundle format. Compatibility depends on the tool version. Stop old writers before using the new ledger. Keep writer versions separate and avoid in-place downgrades. The maintenance procedure enforces this boundary since the runtime has yet to enforce a minimum version automatically.
 
-Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. Workflow binding digests include absolute locations. Cross-machine rebinding, central control, and upgrades to the running service still require validation.
+Content hashes verify evidence bytes. When one local OS user can forge a consistent set of component receipts, hashes cannot authenticate the receipts' origin. The original workflow binding digest includes absolute locations. Offline recovery maps new locations separately and preserves the original bindings and task identities. Central control and upgrades to the running service still require validation.
+
+## Offline synthetic domain recovery
+
+The checkpoint preserves actual synthetic research, content, and ledger data with the original bindings and explicitly referenced CAS evidence. The operator must own the source, stop its writers, and use a new destination. Active tasks, populated scheduling tables, unfinished external calls, and SQLite sidecar files are rejected. A separate recovery configuration maps the new locations while preserving the original v1 identity. Ordinary v7 still rejects ledgers with unknown tasks or held usage. The offline checkpoint uses its own format.
+
+Historical access is read-only by default. An explicit synthetic rehearsal can check only listed unknown tasks and record historical findings without rerunning them. Held usage and revocations captured in the snapshot are preserved. Later revocations are unverified. Pinning file identity does not prevent a local operator from editing the database directly. The scope is offline synthetic workspaces, with live backup, real data, and continuous operation still awaiting validation.
+
+The [offline recovery guide](tools/m0_backup/README.md#offline-synthetic-recovery) contains the demo command.
 
 ## Verify Dispatch
 

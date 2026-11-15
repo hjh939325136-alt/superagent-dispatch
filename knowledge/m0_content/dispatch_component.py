@@ -14,6 +14,7 @@ from sa_dispatch.canonical import sha256_ref
 from knowledge.m0_content.workflow_binding import WorkflowError,load_workflow_binding,parse_json,search_modules,request_base
 from knowledge.m0_content.workflow_guard import dependency_guard,require_guard
 from knowledge.m0_content.dispatch_entry import validate_params,WRITES,OPERATIONS,PRECOMMIT_CODES
+from tools.m0_backup.domain_binding import check_recovery_binding_current,require_recovery_operation
 
 
 class PrecommitRejected(WorkflowError):
@@ -45,10 +46,13 @@ def invoke(binding,request):
         if (request['idempotency_key'] is not None or not isinstance(payload,dict) or
             set(payload)!={'task_id','fence','operation','write_key','request_hash','binding_hash','catalog_instance','content_instance'} or payload['operation'] not in WRITES or
             type(payload['fence']) is not int or payload['fence']<1 or
+            not isinstance(payload['task_id'],str) or
             request['request_id']!='reconcile-'+payload['task_id'] or
             payload['write_key']!=payload['task_id']+':'+payload['operation']+'@1' or
             not re.fullmatch('sha256:[0-9a-f]{64}',payload['request_hash'])):
             raise WorkflowError('INVALID_LOOKUP')
+        require_recovery_operation(binding,'operation.lookup',payload['task_id'])
+        check_recovery_binding_current(binding,'workflow')
         expected={'binding_hash':binding.digest,'catalog_instance':binding.research.instance,'content_instance':binding.content_instance}
         if any(payload.get(k)!=v for k,v in expected.items()):
             return envelope(request['request_id'],{'state':'instance_mismatch',**payload})
