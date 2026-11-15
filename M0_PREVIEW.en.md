@@ -88,6 +88,10 @@ The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en
 
 ## Sandbox and delivery progress
 
+The development candidate includes a common-source builder and offline verifier for research, content, and synthetic HTTP tasks that use a shared Dispatch ledger. The verifier checks the file set and digests without Git, extraction, or execution of package contents.
+
+The distribution is `source_candidate` and `installer_entry` is `null`. The common installer entry point is still in development. Target validation compares the expected manifest digest and machine identity. Fresh VM installation and real systemd startup still need verification.
+
 A systemd timer completed one synthetic task in an isolated Debian sandbox. Reinstalling and starting the service again kept one task and one attempt in the ledger. Debian passed 46 tests. Windows passed 45 and skipped one POSIX-only check. A simulator supplied the model response. Real model calls: 0.
 
 Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.

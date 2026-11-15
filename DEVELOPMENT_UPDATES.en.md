@@ -134,3 +134,11 @@ This release provides source for the R1 single-task simulation installer and a l
 - The local query returns task state, schedule time, usage, and the result reference. It leaves a missing ledger absent.
 - Remote credential delivery and the SSH query client are outside this release. They require separate receiver software and authorization.
 - Public source passed 93 tests on Debian. Windows passed 91 and skipped two POSIX-only cases. Both platforms rebuilt and verified the package offline. System installation, live SSH access, and real model calls have separate acceptance requirements.
+
+## 2026-11-16 Common-source package progress
+
+The development candidate includes a common-source builder and offline verifier for research, content, and synthetic HTTP tasks that use a shared Dispatch ledger. The verifier checks the file set and digests without Git, extraction, or execution of package contents.
+
+The distribution is `source_candidate` and `installer_entry` is `null`. The common installer entry point is still in development. Target validation compares the expected manifest digest and machine identity. Fresh VM installation and real systemd startup still need verification.
+
+The same development candidate passed 45 tests on Windows and 35 on Debian. The 10 developer-side build tests ran only on Windows because the Debian test environment had no Git. Target-side offline verification passed on Debian. This update documents the progress while the public build dependencies are being completed.

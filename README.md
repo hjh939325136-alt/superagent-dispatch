@@ -68,6 +68,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 ## 当前进度
 
+共同源码包仍处于开发验证阶段。详情见[开发更新](DEVELOPMENT_UPDATES.md)。
+
 目前公开的是单机样例和实验维护工具。最新的适配器与安装演练进度见[开发更新](DEVELOPMENT_UPDATES.md)。
 
 公开源码已在 Windows 和隔离 Debian 上跑过本机样例。演示使用合成资料和模拟审核。一套专属合成 Debian 沙盒已实际从 `0011` 升级到 `0012` 隔离模式。升级后核对了原历史任务、未采信迟到审计、统一事件、采集游标和证据对象。混合模式激活、原生研究与内容接线、Collector 逐流显式接续仍待完成。完整 M0 尚未就绪。

@@ -68,6 +68,8 @@ The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en
 
 ## Current status
 
+The common-source package is still in development validation. See the [development updates](DEVELOPMENT_UPDATES.en.md).
+
 The public preview includes local examples and experimental maintenance tools. See [development updates](DEVELOPMENT_UPDATES.en.md) for the latest adapter and installation rehearsal progress.
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
