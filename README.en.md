@@ -45,6 +45,8 @@ Mixed mode can bind approvals and settle synthetic usage per task. For a support
 
 This preview can also restore an owned, stopped synthetic workspace to a new directory while preserving its original task identities. Restored data is read-only by default. An explicit rehearsal can check listed historical tasks and cannot run them again. Try the [offline recovery demo](tools/m0_backup/README.md#offline-synthetic-recovery) in a temporary workspace.
 
+Offline recovery also preserves settled scheduling history. Restored schedules and slots can be inspected read-only. An old enabled flag remains historical, and the recovery tools do not run overdue slots.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

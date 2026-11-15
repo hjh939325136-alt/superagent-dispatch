@@ -57,3 +57,11 @@ An offline synthetic workspace can now be restored to a new location while prese
 - The checkpoint preserves research, content, the ledger, and known evidence. Use an owned, stopped source and a new destination. Ordinary v7 still rejects unknown tasks.
 - Historical access is read-only by default. An explicit rehearsal can check only listed historical tasks and never reruns the write. Original identity, held usage, and revocations captured in the snapshot are preserved.
 - A checkpoint created on Windows was restored in isolated Debian. Later revocations remain unverified. Live backup, real data, and continuous operation still need validation.
+
+## 0.1.1-m0.8 (2026-11-15)
+
+Offline recovery now preserves settled scheduling history and evidence referenced only by schedule templates.
+
+- Read-only schedule-status shows the original enabled flags, versions, slots, and task records. The demo captures three completed synthetic slots. Recovery refuses scheduling commands even after a fourth slot becomes due.
+- Support covers settled standard read-only hotspot.topic_fetch@1 plans on the complete current schema. Legitimate retry diagnostics and deduplicated event summaries are preserved. The summaries have limited evidence about individual slots.
+- Use 0.1.1-m0.8 or a later compatible tool for domain checkpoints with schedule history. Ordinary v7 eligibility is unchanged. Pending reservations, custom kinds, and restarting production schedules remain unsupported.

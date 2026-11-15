@@ -395,6 +395,15 @@ class RecoveryBindingTests(unittest.TestCase):
                 code, result = cli(entry, 'receipt', task_id)
                 self.assertEqual(code, 0)
                 self.assertEqual(result['data']['response'], response)
+                code, result = cli(entry, 'schedule-status')
+                self.assertEqual(code, 0)
+                self.assertEqual(result['data']['schedules'], [])
+                self.assertFalse(result['data']['execution_authorized'])
+                self.assertFalse(result['data']['scheduler_started'])
+                self.assertTrue(result['data']['stored_flags_are_historical'])
+                code, result = cli(entry, 'schedule-status', task_id)
+                self.assertEqual(code, 2)
+                self.assertEqual(result['error']['code'], 'RECOVERY_DISPATCH_COMMAND_DENIED')
             foreign = self.root / 'foreign.sqlite3'
             configure(foreign, combined=combined)
             code, result = cli(entry, 'status')
@@ -423,6 +432,7 @@ class RecoveryBindingTests(unittest.TestCase):
             trace = observe('trace', task_id)
             self.assertTrue(trace['events'])
             self.assertEqual(trace['ledger_events'][-1]['to_status'], 'succeeded')
+            self.assertEqual(observe('schedule-status')['schedules'], [])
             config.execution_route = 'local_synthetic'
             with self.assertRaisesRegex(RecoveryBindingError, 'RECOVERY_DISPATCH_ROUTE_REQUIRED'):
                 observe('status', task_id)

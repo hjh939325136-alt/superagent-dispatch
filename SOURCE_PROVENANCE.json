@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "f3a959e5c3c616089d4b119d09dcfa11ae8226da08a8dc14b96deb941aba3087"
+    "staged_sha256": "ce746b1f129c3321fd7b5c8e1861db00444744652c4e19c018b1ea3d8979609c"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "bdb3dfa02f20585053beefbdcf8a12f053a5be16e4a3582b9220b391c8de212f"
+    "staged_sha256": "de6bf69699276af7ed9fd2d8877c21116847650882fbfced7d8d7b7275d6e3b9"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "905e8f6d854d047290a8ae43ffa09325ae67fdf4d11cd9d99b1e323dbe12ab7b"
+    "staged_sha256": "6077f1b94792d84d00841f901f7cd9f60cf79b252677136f550b929b025288ca"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "89edf67a47a22d8b6896c9d0865a74b9e7661936807e8083fa368d9f77c65faf"
+    "staged_sha256": "0fb48d00311ae5aad3c1cd8fc6cb410fa51b40b8d74e44e2736291da7dfeef5b"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -941,8 +941,8 @@
   },
   "knowledge/m0_content/recovery_dispatch.py": {
     "source": "knowledge/m0_content/recovery_dispatch.py",
-    "source_sha256": "efdf2cc04d3b021b3936bccafea88971622510e9f8ba1c4833cef0b9551fbf7d",
-    "staged_sha256": "efdf2cc04d3b021b3936bccafea88971622510e9f8ba1c4833cef0b9551fbf7d"
+    "source_sha256": "e559478e8526b42f5149d7679ccfae999fb50ca28a34500c4a9301678bc47a82",
+    "staged_sha256": "e559478e8526b42f5149d7679ccfae999fb50ca28a34500c4a9301678bc47a82"
   },
   "knowledge/m0_content/run_research_pipeline_lab.py": {
     "source": "knowledge/m0_content/run_research_pipeline_lab.py",
@@ -956,8 +956,8 @@
   },
   "knowledge/m0_content/test_recovery_binding.py": {
     "source": "knowledge/m0_content/test_recovery_binding.py",
-    "source_sha256": "4e9742b74d909876ad2b1e80fd6a3f8af42d301f9c0b007958a5d3c8b20655b0",
-    "staged_sha256": "4e9742b74d909876ad2b1e80fd6a3f8af42d301f9c0b007958a5d3c8b20655b0"
+    "source_sha256": "f2c84009857bc87a6b8155195223bb860f771e72a79c010e0327ed7027113075",
+    "staged_sha256": "f2c84009857bc87a6b8155195223bb860f771e72a79c010e0327ed7027113075"
   },
   "knowledge/m0_content/test_workflow_content.py": {
     "source": "knowledge/m0_content/test_workflow_content.py",
@@ -1071,7 +1071,7 @@
   },
   "tools/m0_backup/README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "76106754ad481f086ff59a88a0d600e8b9bbf39074b7ef938aced4ca3606d979"
+    "staged_sha256": "2f6e77651eaa98f8477f3cb29631fd5c583fc5d1080a7f82ebe11be09a5266ab"
   },
   "tools/m0_backup/__init__.py": {
     "source": "tools/m0_backup/__init__.py",
@@ -1090,18 +1090,23 @@
   },
   "tools/m0_backup/domain_checkpoint.py": {
     "source": "tools/m0_backup/domain_checkpoint.py",
-    "source_sha256": "0154d041db44188bed0f8e1329d80492b93a4001ab5246ebd98fffdb83cfac85",
-    "staged_sha256": "0154d041db44188bed0f8e1329d80492b93a4001ab5246ebd98fffdb83cfac85"
+    "source_sha256": "c8d8714a54b8c759664c25d90550dc208098260800a91bbbd9fa73bfbc5b969f",
+    "staged_sha256": "c8d8714a54b8c759664c25d90550dc208098260800a91bbbd9fa73bfbc5b969f"
   },
   "tools/m0_backup/run_domain_recovery_lab.py": {
     "source": "tools/m0_backup/run_domain_recovery_lab.py",
-    "source_sha256": "510c825f9634c4090cb68099d3ff3399fcdab7172a9a5fe170141d3a081f4e48",
-    "staged_sha256": "510c825f9634c4090cb68099d3ff3399fcdab7172a9a5fe170141d3a081f4e48"
+    "source_sha256": "2eb1fad221f5d258f60676e69af005bd75b470564075d65344c6d2602934f778",
+    "staged_sha256": "2eb1fad221f5d258f60676e69af005bd75b470564075d65344c6d2602934f778"
+  },
+  "tools/m0_backup/schedule_checkpoint.py": {
+    "source": "tools/m0_backup/schedule_checkpoint.py",
+    "source_sha256": "21ce9e473b8cca6f6e6c7915e6b2040f39598f5f0d79853967d59281daf2a8b1",
+    "staged_sha256": "21ce9e473b8cca6f6e6c7915e6b2040f39598f5f0d79853967d59281daf2a8b1"
   },
   "tools/m0_backup/test_domain_checkpoint.py": {
     "source": "tools/m0_backup/test_domain_checkpoint.py",
-    "source_sha256": "ff5f9b312d1a32dd2ceb1cebb3e86b86a0494599eb62e6c0771c841fce403c03",
-    "staged_sha256": "ff5f9b312d1a32dd2ceb1cebb3e86b86a0494599eb62e6c0771c841fce403c03"
+    "source_sha256": "ce60798d633bcb886fb3a334a01462796495fdbd29561c72168bb989093eed99",
+    "staged_sha256": "ce60798d633bcb886fb3a334a01462796495fdbd29561c72168bb989093eed99"
   },
   "tools/m0_inventory/__init__.py": {
     "source": "tools/m0_inventory/__init__.py",

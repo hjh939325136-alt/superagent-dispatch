@@ -23,6 +23,14 @@ def _task(row):
 
 
 def _observe(db, action, task_id, artifacts):
+    if action == 'schedule-status':
+        tables = {'schedules': 'id', 'schedule_firings': 'scheduled_at,fire_key', 'schedule_events': 'seq'}
+        rows = {name: [dict(row) for row in db.execute('SELECT * FROM ' + name + ' ORDER BY ' + order)]
+                for name, order in tables.items()}
+        return {'schedules': rows['schedules'], 'firings': rows['schedule_firings'],
+                'events': rows['schedule_events'], 'scope': 'captured_ledger_all_routes',
+                'stored_flags_are_historical': True, 'scheduler_started': False,
+                'execution_authorized': False}
     if task_id is None:
         return {'tasks': [_task(row) for row in db.execute('SELECT * FROM tasks ORDER BY created_at,task_id')]}
     task = _task(db.execute('SELECT * FROM tasks WHERE task_id=?', (task_id,)).fetchone())
@@ -49,8 +57,9 @@ def _observe(db, action, task_id, artifacts):
 def run_recovery_dispatch(config, plugins, binding, role, args):
     action = args[0] if args else None
     task_id = args[1] if len(args) == 2 else None
-    if (action not in ('status', 'receipt', 'trace', 'reconcile') or len(args) > 2 or
-            (action != 'status' and task_id is None) or
+    if (action not in ('status', 'receipt', 'trace', 'reconcile', 'schedule-status') or len(args) > 2 or
+            (action not in ('status', 'schedule-status') and task_id is None) or
+            (action == 'schedule-status' and len(args) != 1) or
             (task_id is not None and not IDENTITY.fullmatch(task_id))):
         raise RecoveryBindingError('RECOVERY_DISPATCH_COMMAND_DENIED')
     if action == 'reconcile':

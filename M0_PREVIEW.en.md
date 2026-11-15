@@ -46,9 +46,13 @@ Content hashes verify evidence bytes. When one local OS user can forge a consist
 
 ## Offline synthetic domain recovery
 
-The checkpoint preserves actual synthetic research, content, and ledger data with the original bindings and explicitly referenced CAS evidence. The operator must own the source, stop its writers, and use a new destination. Active tasks, populated scheduling tables, unfinished external calls, and SQLite sidecar files are rejected. A separate recovery configuration maps the new locations while preserving the original v1 identity. Ordinary v7 still rejects ledgers with unknown tasks or held usage. The offline checkpoint uses its own format.
+The checkpoint preserves actual synthetic research, content, and ledger data with the original bindings and explicitly referenced CAS evidence. The operator must own the source, stop its writers, and use a new destination. Active tasks, pending schedule reservations, unfinished external calls, and SQLite sidecar files are rejected. A separate recovery configuration maps the new locations while preserving the original v1 identity. Ordinary v7 still rejects ledgers with unknown tasks or held usage. The offline checkpoint uses its own format.
 
 Historical access is read-only by default. An explicit synthetic rehearsal can check only listed unknown tasks and record historical findings without rerunning them. Held usage and revocations captured in the snapshot are preserved. Later revocations are unverified. Pinning file identity does not prevent a local operator from editing the database directly. The scope is offline synthetic workspaces, with live backup, real data, and continuous operation still awaiting validation.
+
+Starting in `0.1.1-m0.8`, checkpoints preserve settled schedule history and pinned references used only by current or frozen templates. `schedule-status` uses a read-only connection to show plans, slots, and events across all captured routes. Original enabled flags, versions, and task rows are preserved. The flags describe history and grant no permission to run. Recovery rejects `schedule-tick` and `schedule-upsert`. Schedule events are deduplicated aggregates with limited evidence about individual slots.
+
+This scope covers settled standard read-only `hotspot.topic_fetch@1` plans on the complete current schema. Pending reservations, custom kinds, incomplete older schemas, active work, and restarting production scheduling remain unsupported. Use `0.1.1-m0.8` or a later compatible tool to read domain checkpoints with schedule history. Ordinary v7 eligibility stays the same.
 
 The [offline recovery guide](tools/m0_backup/README.md#offline-synthetic-recovery) contains the demo command.
 

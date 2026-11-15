@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 for directory in (ROOT, ROOT / 'dispatch'):
@@ -34,7 +35,60 @@ def query_digest(path):
         return hashlib.sha256(encode(result).encode()).hexdigest()
 
 
-def create_source(work):
+def schedule_rows(path):
+    with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
+        db.row_factory = sqlite3.Row
+        return {name: [dict(row) for row in db.execute('SELECT * FROM ' + name + ' ORDER BY ' + order)]
+                for name, order in {'schedules': 'id', 'schedule_firings': 'scheduled_at,fire_key',
+                                    'schedule_events': 'seq'}.items()}
+
+
+def add_schedule_history(work):
+    """Three elapsed-clock slots with deterministic synthetic worker receipts."""
+    from sa_dispatch.artifacts import ArtifactStore
+    from sa_dispatch.clock import timestamp
+    from sa_dispatch.executor import receipt_bytes
+    from sa_dispatch.models import TaskSpec
+    from sa_dispatch.scheduler import Scheduler
+    from sa_dispatch.store_sqlite import SqliteStore
+    from sa_dispatch_hotspot import KINDS
+
+    store = SqliteStore(work / 'ledger.sqlite3', lease_ttl_seconds=30, kinds=KINDS, route='http_synthetic')
+    store.register_device('recovery-schedule-worker', ['component:mgmtcore'])
+    artifacts = ArtifactStore(work / 'artifacts')
+    scheduler = Scheduler(store)
+    template = {'idem_key': 'recovery-template', 'kind': 'hotspot.topic_fetch', 'kind_version': 1,
+                'params': {'op': 'topic.list', 'filters': {'limit': 1}}, 'input_refs': [],
+                'required_caps': ['component:mgmtcore'], 'access': 'synthetic', 'egress': 'none',
+                'max_attempts': 1}
+    start = datetime.now(timezone.utc)
+    scheduler.upsert('recovery-schedule', interval_seconds=1, task_template=template,
+                     next_fire_at=timestamp(start), catchup='all', max_catchup=3, max_slots=4)
+    for index in range(3):
+        target = start + timedelta(seconds=index)
+        time.sleep(max(0, (target - datetime.now(timezone.utc)).total_seconds()))
+        fired = scheduler.tick(limit=1)
+        assert len(fired) == 1 and fired[0]['task_id'], fired
+        lease = store.claim('recovery-schedule-worker')
+        assert lease and lease.task_id == fired[0]['task_id']
+        receipt = artifacts.put(receipt_bytes({'synthetic': True, 'task_id': lease.task_id,
+            'scope': 'schedule-history-fixture', 'external_platform_calls': 0}))
+        store.complete(lease.lease_id, lease.fence, {'status': 'succeeded', 'result': {'receipt': receipt},
+            'evidence': [{'kind': 'schedule_fixture_receipt', 'content_hash': receipt,
+                          'artifact_hash': receipt, 'access': 'synthetic'}]}, 'recovery-schedule-worker')
+    # Reference present only in a disabled template must survive capture too.
+    fixed = artifacts.put(receipt_bytes({'synthetic': True, 'purpose': 'template-only-reference'}))
+    future = template | {'input_refs': [{'owner': 'fixture', 'kind': 'source', 'id': 'future',
+                                         'version': '1', 'hash': fixed}]}
+    scheduler.upsert('recovery-disabled-reference', interval_seconds=60, task_template=TaskSpec.from_dict(future),
+                     next_fire_at=timestamp(start + timedelta(hours=1)), enabled=False, max_slots=1)
+    rows = schedule_rows(store.path)
+    active = next(row for row in rows['schedules'] if row['id'] == 'recovery-schedule')
+    assert active['enabled'] == 1 and len(rows['schedule_firings']) == 3
+    return rows
+
+
+def create_source(work, *, with_schedules=False):
     from knowledge.m0_content.run_research_pipeline_lab import Commands, now, prepare
     from knowledge.m0_content.workflow_binding import request_base, search_modules
     from sa_dispatch.artifacts import ArtifactStore
@@ -78,6 +132,7 @@ def create_source(work):
     _, catalog, _, _ = search_modules()
     catalog.Catalog(binding.research.catalog_root).apply_batch(
         'research-scatter', 'recovery-revoke', 'revoke_locked', operator_grant=catalog.OPERATOR)
+    scheduling = add_schedule_history(work) if with_schedules else None
     with closing(store._connect()) as db:
         db.row_factory = sqlite3.Row
         intent = dict(db.execute("SELECT * FROM evidence WHERE task_id=? AND kind='invocation_intent'",
@@ -86,7 +141,7 @@ def create_source(work):
     write(work / 'scenario.json', {'task': task, 'intent': intent, 'holds': holds,
         'selected': selected, 'research_sha256': binding.research.digest,
         'workflow_sha256': binding.digest, 'catalog_instance': binding.research.instance,
-        'content_instance': binding.content_instance,
+        'content_instance': binding.content_instance, 'schedule_history': scheduling,
         'original_locators': [str(work), str(binding.research.path), str(binding.path),
                               str(binding.research.catalog_root), str(binding.content_path)]})
 
@@ -134,6 +189,7 @@ def verify_restored(work, scenario, restored):
     with closing(sqlite3.connect(dbpath.as_uri() + '?mode=ro', uri=True)) as db:
         db.row_factory = sqlite3.Row
         records = snapshot_records(db)
+        original_task_ids = {row['task_id'] for row in records['tasks']}
     try:
         portable(records)
     except ArtifactError:
@@ -147,21 +203,47 @@ def verify_restored(work, scenario, restored):
     assert result['current_usable'] is False, result
     repeat = commands.cli('reconcile', task_id, ok=False)
     denied = commands.cli('run-once', ok=False)
+    scheduling = scenario.get('schedule_history')
+    due_schedule_ids = []
+    if scheduling is not None:
+        due = datetime.fromisoformat(next(row['next_fire_at'] for row in scheduling['schedules']
+                                          if row['id'] == 'recovery-schedule'))
+        delay = max(0, (due - datetime.now(timezone.utc)).total_seconds() + 0.02)
+        assert delay <= 5, 'unexpected lab clock skew'
+        time.sleep(delay)
+        due_schedule_ids = [row['id'] for row in scheduling['schedules'] if row['enabled'] and
+                            datetime.fromisoformat(row['next_fire_at']) <= datetime.now(timezone.utc)]
+        assert 'recovery-schedule' in due_schedule_ids
+        seen = commands.cli('schedule-status')
+        assert seen['schedules'] == scheduling['schedules']
+        assert seen['firings'] == scheduling['schedule_firings']
+        assert seen['events'] == scheduling['schedule_events']
+        assert seen['stored_flags_are_historical'] is True
+        assert seen['scheduler_started'] is False and seen['execution_authorized'] is False
+        commands.cli('schedule-tick', ok=False)
+        commands.cli('schedule-upsert', ok=False)
+        assert schedule_rows(dbpath) == scheduling, 'restored scheduling history mutated'
     with closing(sqlite3.connect(dbpath.as_uri() + '?mode=ro', uri=True)) as db:
         db.row_factory = sqlite3.Row
         task = dict(db.execute('SELECT * FROM tasks WHERE task_id=?', (task_id,)).fetchone())
         intent = dict(db.execute("SELECT * FROM evidence WHERE task_id=? AND kind='invocation_intent'",
                                  (task_id,)).fetchone())
         holds = [dict(row) for row in db.execute('SELECT * FROM control_reservations')]
+        restored_task_ids = {row[0] for row in db.execute('SELECT task_id FROM tasks')}
     assert (task['status'], task['attempts'], task['fingerprint']) == (
         'succeeded', 1, scenario['task']['fingerprint'])
     assert intent == scenario['intent'], 'original intent mutated'
     assert holds == scenario['holds'], 'lookup changed held budget'
+    assert restored_task_ids == original_task_ids, 'recovery created new tasks'
     assert before == {str(path): query_digest(path) for path in domain_paths}, 'domain mutated'
     return {'old_locators_absent': missing, 'historical_identity_preserved': True,
             'domain_query_hashes_unchanged': before, 'v7_unknown_rejected': v7_rejected,
             'reconciliation': result, 'repeat_rejected': repeat, 'new_execution_rejected': denied,
             'held_budget_preserved': True, 'captured_revocation_preserved': True,
+            'schedule_history_preserved': scheduling is not None,
+            'schedule_firings': 0 if scheduling is None else len(scheduling['schedule_firings']),
+            'due_schedule_ids': due_schedule_ids, 'task_set_unchanged': True,
+            'restored_scheduler_started': False,
             'revocation_basis': 'captured_snapshot', 'post_snapshot_revocations': 'unverified'}
 
 
@@ -186,7 +268,7 @@ def run_lab():
         root = Path(folder).resolve()
         source = root / 'source'
         source.mkdir()
-        stopped = run_child('--create', source, return_handle=True)
+        stopped = run_child('--create', source, '--with-schedules', return_handle=True)
         scenario = json.loads((source / 'scenario.json').read_bytes())
         package = root / 'checkpoint'
         anchor = capture_checkpoint(source, package, stopped_processes=[stopped],
@@ -212,10 +294,11 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--create', type=Path)
     mode.add_argument('--verify', type=Path)
+    parser.add_argument('--with-schedules', action='store_true')
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     if args.create:
-        create_source(args.create.resolve())
+        create_source(args.create.resolve(), with_schedules=args.with_schedules)
         return
     if args.verify:
         data = json.loads(args.verify.read_bytes())

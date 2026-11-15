@@ -31,6 +31,8 @@ from sa_dispatch.migrations import apply_m0_schema
 from sa_dispatch.models import DispatchError
 from sa_dispatch.routing import LOCAL_ROUTE, ROUTED_TABLES, ROUTES, validate_mixed_records
 
+from .schedule_checkpoint import ScheduleHistoryError, validate_history as validate_schedule_history
+
 
 DATABASES = (*archive.CATALOG_FILES[1:], 'content.sqlite3', 'dispatch.sqlite3')
 MARKER = archive.CATALOG_FILES[0]
@@ -267,8 +269,11 @@ def _ledger_admission(records, binding, cas):
              all(row['access'] == 'synthetic' for row in records['evidence']) and
              all(row['class'] != 'local_only' for row in records['unified_events']),
              'checkpoint requires synthetic no-egress tasks and evidence')
-    for table in ('schedules', 'schedule_firings', 'schedule_events', 'late_results'):
-        _require(not records[table], 'checkpoint does not support populated ' + table)
+    _require(not records['late_results'], 'checkpoint does not support populated late_results')
+    try:
+        schedule_refs = validate_schedule_history(records)
+    except ScheduleHistoryError as error:
+        raise CheckpointError(str(error)) from error
     for table in ('leases', 'events', 'evidence', 'reconciliations', 'transport_handoffs',
                   'transport_artifact_grants', 'control_task_rules', 'control_reservations',
                   'control_approvals', 'host_attempts', 'host_events', 'claude_attempts'):
@@ -318,7 +323,7 @@ def _ledger_admission(records, binding, cas):
                          for item in records['reconciliations']), 'unknown attempt already has completion evidence')
         allowed.add(task_id)
     _budget_admission(records, tasks, leases, allowed, cas)
-    return tasks, requests, sorted(allowed)
+    return tasks, requests, sorted(allowed), schedule_refs
 
 
 def _budget_admission(records, tasks, leases, allowed, cas):
@@ -547,7 +552,7 @@ def _domain_receipts(binding, cas, tasks, requests, receipts):
     return roots
 
 
-def _dispatch_refs(records, domain_refs):
+def _dispatch_refs(records, domain_refs, schedule_refs):
     roots = set()
 
     def follow(ref):
@@ -559,15 +564,20 @@ def _dispatch_refs(records, domain_refs):
         else:
             roots.add('sha256:' + digest)
 
+    def follow_structured(ref):
+        _require(set(ref) == {'owner', 'kind', 'id', 'version', 'hash'} and
+                 archive._matches(archive.HASH_REF, ref['hash']), 'invalid Dispatch structured reference')
+        follow(f"{ref['owner']}/{ref['kind']}/{ref['id']}@{ref['version']}#{ref['hash']}")
+
     for row in (*records['tasks'], *records['evidence']):
         if 'input_refs_json' in row:
             refs = archive._parse('{"refs":' + row['input_refs_json'] + '}')['refs']
         else:
             refs = [] if row['ref_json'] is None else [archive._parse(row['ref_json'])]
         for ref in refs:
-            _require(set(ref) == {'owner', 'kind', 'id', 'version', 'hash'} and
-                     archive._matches(archive.HASH_REF, ref['hash']), 'invalid Dispatch structured reference')
-            follow(f"{ref['owner']}/{ref['kind']}/{ref['id']}@{ref['version']}#{ref['hash']}")
+            follow_structured(ref)
+    for ref in schedule_refs:
+        follow_structured(ref)
     for row in records['unified_events']:
         refs = archive._parse('{"refs":' + row['refs_json'] + '}')['refs']
         for ref in refs:
@@ -578,11 +588,11 @@ def _dispatch_refs(records, domain_refs):
 def _inventory(paths, cas, *, live_root=None):
     binding, identities = _binding_objects(paths, live_root=live_root)
     records = _ledger(paths)
-    tasks, requests, allowed = _ledger_admission(records, binding, cas)
+    tasks, requests, allowed, schedule_refs = _ledger_admission(records, binding, cas)
     research_refs, contexts, catalog_receipts = _research_state(binding)
     content_refs, content_receipts = _content_state(binding, contexts)
     roots = _domain_receipts(binding, cas, tasks, requests, catalog_receipts + content_receipts)
-    roots.update(_dispatch_refs(records, research_refs | content_refs))
+    roots.update(_dispatch_refs(records, research_refs | content_refs, schedule_refs))
     roots.update(bundle._artifact_roots(records, include_fixed_refs=False))
     refs = bundle._known_artifact_inventory(records, cas, roots)
     files = {cas.path(ref).relative_to(cas.root.parent).as_posix(): cas.get(ref) for ref in refs}
