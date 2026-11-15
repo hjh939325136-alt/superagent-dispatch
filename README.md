@@ -1,37 +1,26 @@
 # SuperAgent Dispatch
 
-SuperAgent Dispatch is a Python task coordinator for projects with multiple tools or execution devices. It keeps a SQLite ledger of versioned tasks, capability matching, leases, idempotency keys, and SHA-256 evidence. A content-operations adapter and small synthetic fixtures show how a project can integrate its own tool.
+[English](https://github.com/hjh939325136-alt/superagent-dispatch/blob/v0.1.0/README.md) · [稳定版 v0.1.0](https://github.com/hjh939325136-alt/superagent-dispatch/tree/v0.1.0) · [M0 预览](https://github.com/hjh939325136-alt/superagent-dispatch/tree/preview/m0-source) · [开发更新](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/DEVELOPMENT_UPDATES.md)
 
-## Run from source
+SuperAgent Dispatch 是一个用 Python 写的任务调度工具。一个项目要调用多个脚本或工具时，可以把任务交给 Dispatch，由它记录谁接了任务、任务执行到哪一步、最后拿到了什么结果。记录保存在本机的 SQLite 数据库里，方便事后查验。仓库附带一个内容处理示例，可以用来了解怎么接入自己的脚本。
 
-Use Python 3.11 or later from the checkout root. The runtime uses only the Python standard library.
+## 在本机试用
+
+下载源码，用 Python 3.11 或更新版本，在仓库根目录运行。用 Python 是为了让同一套命令能在 Windows 和 Linux 上运行。SQLite 随 Python 一起使用，本机就能保存和查询任务记录，无需额外安装数据库服务。
 
 ```sh
 python -B -m sa_dispatch selftest
 python -B -m unittest discover -s tests -v
 ```
 
-The self-test creates a separate temporary ledger, runs three synthetic jobs, exports completed task history, and confirms the new ledger can read the same receipts without replaying component calls. The tests also exercise the foreground coordinator, authorization, and process restart.
+第一条命令在临时目录创建数据库，用示例数据跑完任务，再检查导出的任务记录能否在新库中读回。第二条运行回归测试，包括权限检查和进程重启后的行为。
 
-## Deploy a synthetic coordinator
+## 现在能用到哪一步
 
-The foreground service runs on IPv4 loopback. Its dedicated ledger serves synthetic tasks and fixtures only. The [Linux deployment guide](deploy/README.md) covers setup on a systemd host, generating separate dispatcher and worker credentials, a smoke check across service restart, and offline backup verification.
+稳定版 v0.1.0 覆盖单机任务调度和样例任务交接。Linux 上可以按 [systemd 部署指南（英文）](deploy/README.md) 启动仅本机可访问的示例服务，检查服务重启以及备份能否恢复。SQLite 数据放在本地文件系统，每个数据库由一个调度进程管理。真实业务数据、访问凭据和运行配置由各自系统保管。
 
-The source CLI and synthetic tests are portable. Linux systemd deployment has a separate checklist. Use a local filesystem for the SQLite ledger, with one coordinator per ledger. Keep real project data, component credentials, and live configuration in the systems that own them. Host identities and fixture credentials are operator configuration, separate from released code.
+真实设备接入、跨设备执行、整机重启后的恢复和真实数据库迁移仍待验证。更多查询、内容流程和备份演示见 [M0 预览](https://github.com/hjh939325136-alt/superagent-dispatch/blob/preview/m0-source/M0_PREVIEW.md)。
 
-## Project structure
+## 接入自己的脚本
 
-| Directory | Contents |
-| --- | --- |
-| `sa_dispatch/` | Ledger, task contracts, artifact store, CLI and synthetic transport |
-| `sa_dispatch_hotspot/` | Example content-operations adapter |
-| `deploy/` | Linux service, deployment checks, backup verification, and synthetic smoke client |
-| `tests/` | Regression tests and source-based fixture |
-
-The release scope is single-host coordination and synthetic handoff. Real-device access, data transfer for live business tasks, and host reboot recovery have separate deployment acceptance criteria.
-
-## Use a project adapter
-
-Create a Python entry point that invokes `sa_dispatch.cli.main(plugins={"my-project": KINDS})`, with a mapping from task kind names to trusted adapter objects. Set `plugins = ["my-project"]` in your TOML and configure the corresponding component executable there. A task kind provides `name`, `version`, `enabled`, `side_effect`, `component`, `validate(params)`, `scope(params)`, `request(task)`, and `result(response, task)`. Its optional `allow_no_new` defaults to false. The [included adapter](sa_dispatch_hotspot/__init__.py) shows the request and response shape. The worker gives the configured executable a generated JSON request file and expects a JSON response with the original `request_id`. Test task validation, response binding and duplicate requests using synthetic fixtures before using a component on real records.
-
-For the local executor, the request includes `idempotency_key`, which can be null for reads. Synthetic reconciliation uses the included fixture's `fake.write.get` contract. Other write adapters can leave uncertain results in `unknown` until their operator has enough evidence to reconcile them.
+可以从 [内容处理接入示例](sa_dispatch_hotspot/__init__.py) 开始。脚本读取 Dispatch 生成的 JSON 请求文件，完成后返回含原 `request_id` 的 JSON 响应。适配器如何注册、如何测试重复请求，以及如何处理执行结果暂时无法确认的写操作，见 [英文技术说明](https://github.com/hjh939325136-alt/superagent-dispatch/blob/v0.1.0/README.md#use-a-project-adapter)。
