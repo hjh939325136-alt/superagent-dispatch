@@ -159,3 +159,11 @@ This preview publishes shared ledger 0013, the common install baseline, and time
 - A cold recovery copy was restored to an isolated directory with execution disabled. Explicit Collector adoption replayed 30 events, preserved the original gap record, and left zero lag on three streams.
 - The public source packages built and verified offline. Windows passed 228 tests with two POSIX skips. Debian passed 217 tests. The 13 Git-dependent build tests ran on Windows.
 - The VM observation lasted at least 20 minutes. A 24-hour run, native agent integration, production data migration, and recovery onto independent hardware still need validation.
+
+## 0.1.1-m0.16 (2026-11-16)
+
+Timed producer and reviewer jobs can upgrade frozen source while preserving the grant, tasks, handoffs, and consumed quota.
+
+- The upgrade drains work and verifies a cold recovery copy before switching service units. Ledger or unit drift keeps the startup gate closed.
+- On an isolated Debian VM, the upgrade preserved six units of consumed request quota and three handoffs. Cold recovery, replay with the same arguments, and another normal reboot passed, with zero additional model calls.
+- The rotate-check command performs a read-only preflight for the next grant. Actual rotation and 24-hour steady operation still need validation. The public candidate passed 28 focused tests on each of Windows and Debian.

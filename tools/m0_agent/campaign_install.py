@@ -28,6 +28,7 @@ CREDENTIAL = Path('/run/credstore/provider_api_key')
 ENTRY = 'tools/m0_agent/campaign_install.py'
 RUNTIME = 'tools/m0_agent/campaign_runtime.py'
 SCHEMA = 'superagent.agent_campaign.install.v1'
+UPGRADE_SCHEMA = 'superagent.agent_campaign.upgrade.v1'
 INACTIVE = ('inactive', 'failed')
 _require = old._require
 
@@ -165,6 +166,17 @@ def _backup():
             'manifest_sha256': receipt['manifest_sha256'], 'ledger_version': '0013', 'restore_verified': True}
 
 
+def _campaign_fingerprint():
+    from sa_dispatch.campaign_validation import campaign_records
+
+    with closing(sqlite3.connect(old.LEDGER.as_uri() + '?mode=ro', uri=True)) as conn, conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute('BEGIN')
+        records = campaign_records(conn)
+        return sha256(old._json({table: sorted(sha256(old._json(row)).hexdigest() for row in rows)
+                                 for table, rows in records.items()})).hexdigest()
+
+
 class Installer:
     def __init__(self, release, machine, manifest):
         self.release = release
@@ -174,13 +186,17 @@ class Installer:
         self.timers = tuple(path.name for path in self.units if path.suffix == '.timer')
         self.services = tuple(path.name for path in self.units if path.suffix == '.service')
         self.state_file = AUTHORITY / 'state.json'
+        self.upgrade_file = AUTHORITY / 'upgrade.json'
 
     def _identity(self):
         return {'schema': SCHEMA, 'machine_id': self.machine, 'manifest_sha256': self.manifest}
 
-    def _read(self):
+    def _read_state(self):
         old._root_metadata(AUTHORITY, directory=True, private=True)
-        state = json.loads(old._root_bytes(self.state_file, private=True), object_pairs_hook=old._unique_fields)
+        return json.loads(old._root_bytes(self.state_file, private=True), object_pairs_hook=old._unique_fields)
+
+    def _read(self):
+        state = self._read_state()
         _require(isinstance(state, dict) and all(state.get(k) == v for k, v in self._identity().items()),
                  'campaign receipt belongs to another machine or frozen release')
         _require(state['phase'] in ('prepared', 'paused', 'enabled', 'stopped'), 'invalid campaign install phase')
@@ -341,13 +357,174 @@ class Installer:
         timers = {unit: old._property(unit, 'ActiveState') for unit in self.timers}
         return state | {'campaign': self._operate('status'), 'timers': timers}
 
+    def _save_upgrade(self, receipt, phase, **fields):
+        receipt = {**receipt, **fields, 'phase': phase}
+        old._atomic(self.upgrade_file, old._json(receipt), mode=0o600)
+        return receipt
+
+    def _read_upgrade(self, previous):
+        if not os.path.lexists(self.upgrade_file):
+            return None
+        receipt = json.loads(old._root_bytes(self.upgrade_file, private=True), object_pairs_hook=old._unique_fields)
+        _require(receipt['schema'] == UPGRADE_SCHEMA and receipt['machine_id'] == self.machine
+                 and receipt['phase'] in ('draining', 'switching', 'switched', 'complete'),
+                 'invalid campaign source upgrade receipt')
+        if (receipt['previous_manifest_sha256'], receipt['manifest_sha256']) == (previous, self.manifest):
+            return receipt
+        _require(receipt['phase'] == 'complete' and receipt['manifest_sha256'] == previous,
+                 'another campaign source upgrade is pending or does not match the previous manifest')
+        return None
+
+    def _plan_upgrade(self, previous, release, state):
+        phase = state['phase']
+        _require(state['manifest_sha256'] == previous and phase in ('enabled', 'paused', 'stopped'),
+                 'expected previous manifest must identify a complete campaign installation')
+        # The previous frozen executable derives its own expected unit bytes.
+        probe = old._run('/usr/bin/python3', '-I', '-B', str(release / ENTRY), 'status',
+                         '--expected-machine', self.machine, '--manifest-sha256', previous)
+        _require(json.loads(probe.stdout).get('ok') is True, 'previous campaign startup anchor did not verify')
+        self._anchored(state)
+        _require(all(old._property(timer, 'ActiveState') == 'active' if phase == 'enabled'
+                     else old._property(timer, 'ActiveState') in INACTIVE for timer in self.timers),
+                 'campaign timer state differs from its installed phase')
+        return self._save_upgrade({
+            'schema': UPGRADE_SCHEMA, 'machine_id': self.machine, 'manifest_sha256': self.manifest,
+            'previous_manifest_sha256': previous, 'previous_phase': phase,
+            'previous_units': {path.name: old._root_hash(path) for path in self.units},
+            'http_was_active': old._property(old.HTTP, 'ActiveState') == 'active',
+            'config_sha256': state['config_sha256'],
+        }, 'draining')
+
+    def _upgrade_backup(self, receipt):
+        # Timers are disabled and current workers have already drained.
+        try:
+            old._stop_writers()
+            fingerprint = _campaign_fingerprint()
+            recovery = _backup()
+            _require(_campaign_fingerprint() == fingerprint, 'campaign ledger changed during cold backup')
+            return self._save_upgrade(receipt, 'switching', recovery=recovery, ledger_sha256=fingerprint)
+        finally:
+            self._restore_http(receipt)
+
+    def _restore_http(self, receipt):
+        if receipt['http_was_active'] and old._property(old.HTTP, 'ActiveState') != 'active':
+            old._systemctl('start', old.HTTP)
+
+    def _switch_units(self, receipt):
+        for path, raw in self.units.items():
+            installed = old._root_hash(path)
+            desired = sha256(raw).hexdigest()
+            _require(installed in (receipt['previous_units'][path.name], desired),
+                     'campaign systemd unit changed during source upgrade')
+            if installed != desired:
+                old._atomic(path, raw, mode=0o644)
+        old._systemctl('daemon-reload')
+        self._check_units()
+
+    def _resume_upgraded_timers(self):
+        # Keep the startup guard closed until both timer units are active.
+        _check_credential_source()
+        try:
+            old._systemctl('enable', '--now', *self.timers)
+            _require(all(old._property(unit, 'ActiveState') == 'active' for unit in self.timers),
+                     'campaign timers did not resume after source upgrade')
+        except (old.InstallError, RuntimeError, OSError, old.subprocess.SubprocessError):
+            self._pause_units()
+            raise
+
+    def upgrade(self, previous):
+        _require(isinstance(previous, str) and old.HEX.fullmatch(previous) and previous != self.manifest,
+                 'a different explicit previous manifest SHA256 is required')
+        previous_release = RELEASES / previous
+        _verify_release(previous_release, previous)
+        state = self._read_state()
+        _require(state['machine_id'] == self.machine and state['schema'] == SCHEMA,
+                 'campaign receipt belongs to a different machine or schema')
+        receipt = self._read_upgrade(previous)
+        if receipt is None:
+            receipt = self._plan_upgrade(previous, previous_release, state)
+        _require(state['config_sha256'] == receipt['config_sha256'], 'campaign authorization changed during upgrade')
+        target_phase = receipt['previous_phase']
+        if receipt['phase'] == 'complete':
+            return self.status() | {'upgrade': receipt}
+        if receipt['phase'] == 'switched' and state['manifest_sha256'] == self.manifest and state['phase'] == target_phase:
+            # Startup was restored before the final diagnostic receipt was written.
+            return self.status() | {'upgrade': self._save_upgrade(receipt, 'complete')}
+
+        _require((state['manifest_sha256'], state['phase']) in (
+            (previous, target_phase), (previous, 'upgrading'), (self.manifest, 'upgrading')),
+            'campaign state changed during source upgrade')
+        self._anchored(state)
+        if state['phase'] != 'upgrading':
+            # Write using the previous identity. Older startup guards reject this phase.
+            old._atomic(self.state_file, old._json({**state, 'phase': 'upgrading'}), mode=0o600)
+        self._pause_units()
+        if receipt['phase'] == 'draining':
+            receipt = self._upgrade_backup(receipt)
+        self._restore_http(receipt)
+        _require(_campaign_fingerprint() == receipt['ledger_sha256'], 'campaign ledger changed during source upgrade')
+        self._switch_units(receipt)
+        state = self._save({**state, 'source_upgrade_recovery': receipt['recovery']}, 'upgrading')
+        receipt = self._save_upgrade(receipt, 'switched')
+        self._anchored(state)
+        campaign = self._operate('status')
+        _require(campaign['status'] != 'unregistered', 'registered campaign is missing after source upgrade')
+        if target_phase == 'enabled':
+            self._resume_upgraded_timers()
+        timers = {unit: old._property(unit, 'ActiveState') for unit in self.timers}
+        state = self._save(state, target_phase)
+        return state | {'campaign': campaign, 'timers': timers, 'upgrade': self._save_upgrade(receipt, 'complete')}
+
+    def rotate_check(self, candidate_path):
+        from sa_dispatch.artifacts import ArtifactStore
+        from sa_dispatch.campaign_validation import DEVICES, budget_id, validate_config
+        from sa_dispatch.clock import Clock, timestamp
+        from tools.m0_deploy.install_target import _read_protected
+        from tools.m0_native_mixed.native_adapter import directory_lock
+        from . import campaign_runtime as runtime
+        from .campaign_control import _CampaignStore
+
+        _require(candidate_path.is_absolute() and '..' not in candidate_path.parts,
+                 'rotation candidate must be a protected absolute configuration path')
+        current = self.status()
+        campaign = current['campaign']
+        _require(campaign['status'] in ('paused', 'expired') and campaign['request_units_held'] == 0,
+                 'existing campaign must be terminal with no held requests')
+        candidate = validate_config(json.loads(
+            _read_protected(candidate_path, limit=runtime.common_runtime.CONFIG_LIMIT),
+            object_pairs_hook=old._unique_fields,
+        ))
+        _require(candidate['machine_id'] == self.machine and candidate['ledger_identity'] == current['ledger_identity']
+                 and candidate['campaign_id'] != campaign['campaign_id']
+                 and candidate['authorization_id'] != campaign['authorization_id'],
+                 'rotation candidate must have new identities and use the same machine and ledger')
+        _require(candidate['starts_at'] > timestamp(Clock().now()), 'rotation candidate must start in the future')
+        with directory_lock(old.LEDGER.parent, shared=True):
+            store = _CampaignStore(old.LEDGER, ArtifactStore(old.CAS), candidate)
+            _require(store.status()['status'] == 'unregistered', 'rotation candidate is already registered')
+            with closing(store._connect()) as conn:
+                used = conn.execute('SELECT 1 FROM control_budgets WHERE budget_id=?', (budget_id(candidate),)).fetchone()
+            _require(used is None, 'rotation candidate authorization is already registered')
+            for role in DEVICES:
+                store._bound_text(store._prompt(role))
+        return {'dry_run': True, 'campaign_id': candidate['campaign_id'], 'starts_at': candidate['starts_at'],
+                'expires_at': candidate['expires_at'], 'slots': candidate['slots'],
+                'max_requests': candidate['max_requests'], 'max_tokens': candidate['max_tokens']}
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument('command', choices=('install', 'guard', 'enable', 'pause', 'stop', 'status'))
+    parser.add_argument('command', choices=('install', 'guard', 'enable', 'pause', 'stop', 'status', 'upgrade',
+                                           'rotate-check'))
     parser.add_argument('--expected-machine', required=True)
     parser.add_argument('--manifest-sha256', required=True)
+    parser.add_argument('--expected-previous-manifest')
+    parser.add_argument('--candidate-config', type=Path)
     args = parser.parse_args(argv)
+    if (args.command == 'upgrade') != (args.expected_previous_manifest is not None):
+        parser.error('--expected-previous-manifest is required for upgrade only')
+    if (args.command == 'rotate-check') != (args.candidate_config is not None):
+        parser.error('--candidate-config is required for rotate-check only')
     try:
         _require(sys.platform == 'linux' and os.geteuid() == os.getuid() == 0,
                  'campaign installer requires Linux root')
@@ -369,7 +546,12 @@ def main(argv=None):
             result = getattr(installer, args.command)()
         else:
             with _lock(old.MAINTENANCE_LOCK):
-                result = getattr(installer, args.command)()
+                if args.command == 'upgrade':
+                    result = installer.upgrade(args.expected_previous_manifest)
+                elif args.command == 'rotate-check':
+                    result = installer.rotate_check(args.candidate_config)
+                else:
+                    result = getattr(installer, args.command)()
     except Exception as error:
         result = {'ok': False, 'operation': args.command, 'error': type(error).__name__}
         if isinstance(error, old.InstallError):
