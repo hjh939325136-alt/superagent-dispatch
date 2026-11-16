@@ -29,6 +29,8 @@ ENTRY = 'tools/m0_agent/campaign_install.py'
 RUNTIME = 'tools/m0_agent/campaign_runtime.py'
 SCHEMA = 'superagent.agent_campaign.install.v1'
 UPGRADE_SCHEMA = 'superagent.agent_campaign.upgrade.v1'
+ROTATION_SCHEMA = 'superagent.agent_campaign.rotation.v1'
+ROTATION_TERMINAL = ('complete', 'aborted')
 INACTIVE = ('inactive', 'failed')
 _require = old._require
 
@@ -166,13 +168,31 @@ def _backup():
             'manifest_sha256': receipt['manifest_sha256'], 'ledger_version': '0013', 'restore_verified': True}
 
 
-def _campaign_fingerprint():
-    from sa_dispatch.campaign_validation import campaign_records
+def _campaign_fingerprint(*, exclude_registration=None, require_unregistered=None):
+    from sa_dispatch.campaign_validation import DEVICES, budget_id, campaign_records, schedule_id
 
     with closing(sqlite3.connect(old.LEDGER.as_uri() + '?mode=ro', uri=True)) as conn, conn:
         conn.row_factory = sqlite3.Row
         conn.execute('BEGIN')
         records = campaign_records(conn)
+        if require_unregistered is not None:
+            schedule_ids = tuple(schedule_id(require_unregistered, role) for role in DEVICES)
+            grants = tuple(f"campaign-{require_unregistered['campaign_id']}-{role}" for role in DEVICES)
+            task_prefixes = tuple(f'sched:{grant}:v1:' for grant in grants)
+            found = conn.execute("""SELECT 1 FROM schedules WHERE id IN (?, ?)
+                UNION ALL SELECT 1 FROM schedule_firings WHERE schedule_id IN (?, ?)
+                UNION ALL SELECT 1 FROM control_budgets WHERE budget_id=?
+                UNION ALL SELECT 1 FROM tasks WHERE json_extract(params_json, '$.grant_id') IN (?, ?)
+                    OR substr(idem_key, 1, length(?)) = ? OR substr(idem_key, 1, length(?)) = ? LIMIT 1""",
+                (*schedule_ids, *schedule_ids, budget_id(require_unregistered), *grants,
+                 task_prefixes[0], task_prefixes[0], task_prefixes[1], task_prefixes[1])).fetchone()
+            _require(found is None,
+                     'rotation candidate has registered ledger records; resume rotate')
+        if exclude_registration is not None:
+            schedule_ids = {schedule_id(exclude_registration, role) for role in DEVICES}
+            records['schedules'] = [row for row in records['schedules'] if row['id'] not in schedule_ids]
+            records['control_budgets'] = [row for row in records['control_budgets']
+                                          if row['budget_id'] != budget_id(exclude_registration)]
         return sha256(old._json({table: sorted(sha256(old._json(row)).hexdigest() for row in rows)
                                  for table, rows in records.items()})).hexdigest()
 
@@ -187,6 +207,7 @@ class Installer:
         self.services = tuple(path.name for path in self.units if path.suffix == '.service')
         self.state_file = AUTHORITY / 'state.json'
         self.upgrade_file = AUTHORITY / 'upgrade.json'
+        self.rotation_file = AUTHORITY / 'rotate.json'
 
     def _identity(self):
         return {'schema': SCHEMA, 'machine_id': self.machine, 'manifest_sha256': self.manifest}
@@ -200,6 +221,8 @@ class Installer:
         _require(isinstance(state, dict) and all(state.get(k) == v for k, v in self._identity().items()),
                  'campaign receipt belongs to another machine or frozen release')
         _require(state['phase'] in ('prepared', 'paused', 'enabled', 'stopped'), 'invalid campaign install phase')
+        rotation = self._read_rotation()
+        _require(rotation is None or rotation['phase'] in ROTATION_TERMINAL, 'campaign rotation startup guard is closed')
         return state
 
     def _save(self, state, phase):
@@ -440,6 +463,9 @@ class Installer:
         state = self._read_state()
         _require(state['machine_id'] == self.machine and state['schema'] == SCHEMA,
                  'campaign receipt belongs to a different machine or schema')
+        rotation = self._read_rotation()
+        _require(rotation is None or rotation['phase'] in ROTATION_TERMINAL,
+                 'campaign rotation must finish before upgrade')
         receipt = self._read_upgrade(previous)
         if receipt is None:
             receipt = self._plan_upgrade(previous, previous_release, state)
@@ -475,25 +501,30 @@ class Installer:
         state = self._save(state, target_phase)
         return state | {'campaign': campaign, 'timers': timers, 'upgrade': self._save_upgrade(receipt, 'complete')}
 
-    def rotate_check(self, candidate_path):
-        from sa_dispatch.artifacts import ArtifactStore
-        from sa_dispatch.campaign_validation import DEVICES, budget_id, validate_config
-        from sa_dispatch.clock import Clock, timestamp
+    def _read_candidate(self, candidate_path, expected=None):
+        from sa_dispatch.campaign_validation import validate_config
         from tools.m0_deploy.install_target import _read_protected
-        from tools.m0_native_mixed.native_adapter import directory_lock
         from . import campaign_runtime as runtime
-        from .campaign_control import _CampaignStore
 
         _require(candidate_path.is_absolute() and '..' not in candidate_path.parts,
                  'rotation candidate must be a protected absolute configuration path')
-        current = self.status()
+        _require(candidate_path != runtime.CONFIG, 'rotation candidate must be separate from the active configuration')
+        raw = _read_protected(candidate_path, limit=runtime.common_runtime.CONFIG_LIMIT)
+        if expected is not None:
+            _require(sha256(raw).hexdigest() == expected, 'rotation candidate SHA256 differs from reviewed bytes')
+        return raw, validate_config(json.loads(raw, object_pairs_hook=old._unique_fields))
+
+    def _check_candidate(self, current, candidate):
+        from sa_dispatch.artifacts import ArtifactStore
+        from sa_dispatch.campaign_validation import DEVICES, budget_id
+        from sa_dispatch.clock import Clock, timestamp
+        from tools.m0_native_mixed.native_adapter import directory_lock
+        from .campaign_control import _CampaignStore
+
         campaign = current['campaign']
-        _require(campaign['status'] in ('paused', 'expired') and campaign['request_units_held'] == 0,
-                 'existing campaign must be terminal with no held requests')
-        candidate = validate_config(json.loads(
-            _read_protected(candidate_path, limit=runtime.common_runtime.CONFIG_LIMIT),
-            object_pairs_hook=old._unique_fields,
-        ))
+        self._require_terminal(campaign)
+        _require(not any(os.path.lexists(path) for path in self._aborted_identities(candidate)),
+                 'rotation candidate reuses an aborted campaign or authorization identity')
         _require(candidate['machine_id'] == self.machine and candidate['ledger_identity'] == current['ledger_identity']
                  and candidate['campaign_id'] != campaign['campaign_id']
                  and candidate['authorization_id'] != campaign['authorization_id'],
@@ -507,24 +538,203 @@ class Installer:
             _require(used is None, 'rotation candidate authorization is already registered')
             for role in DEVICES:
                 store._bound_text(store._prompt(role))
+
+    @staticmethod
+    def _require_terminal(campaign):
+        _require(campaign['status'] in ('paused', 'expired') and campaign['request_units_held'] == 0,
+                 'existing campaign must be terminal with no held requests')
+
+    def rotate_check(self, candidate_path):
+        _, candidate = self._read_candidate(candidate_path)
+        self._check_candidate(self.status(), candidate)
         return {'dry_run': True, 'campaign_id': candidate['campaign_id'], 'starts_at': candidate['starts_at'],
                 'expires_at': candidate['expires_at'], 'slots': candidate['slots'],
                 'max_requests': candidate['max_requests'], 'max_tokens': candidate['max_tokens']}
+
+    def _read_rotation(self):
+        if not os.path.lexists(self.rotation_file):
+            return None
+        receipt = json.loads(old._root_bytes(self.rotation_file, private=True), object_pairs_hook=old._unique_fields)
+        _require(receipt['schema'] == ROTATION_SCHEMA and receipt['machine_id'] == self.machine
+                 and receipt['phase'] in ('draining', 'registering', 'switching', 'aborting', *ROTATION_TERMINAL),
+                 'invalid campaign rotation receipt')
+        return receipt
+
+    def _save_rotation(self, receipt, phase, **fields):
+        receipt = {**receipt, **fields, 'phase': phase}
+        old._atomic(self.rotation_file, old._json(receipt), mode=0o600)
+        return receipt
+
+    def _rotation_backup(self, receipt):
+        try:
+            old._stop_writers()
+            fingerprint = _campaign_fingerprint()
+            recovery = _backup()
+            _require(_campaign_fingerprint() == fingerprint, 'campaign ledger changed during rotation backup')
+            return self._save_rotation(receipt, 'registering', recovery=recovery, ledger_sha256=fingerprint)
+        finally:
+            self._restore_http(receipt)
+
+    def _candidate_operation(self, candidate, operation):
+        from sa_dispatch.artifacts import ArtifactStore
+        from tools.m0_native_mixed.native_adapter import directory_lock
+        from . import campaign_control
+
+        with directory_lock(old.LEDGER.parent, shared=True):
+            return getattr(campaign_control, operation)(old.LEDGER, ArtifactStore(old.CAS), candidate)
+
+    def _aborted_identities(self, candidate):
+        for name in ('campaign_id', 'authorization_id'):
+            identity = candidate[name]
+            _require(isinstance(identity, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,47}', identity),
+                     'invalid aborted rotation identity')
+            digest = sha256(identity.encode('ascii')).hexdigest()
+            yield self.rotation_file.with_name(f'rotate-aborted-{name}-{digest}.json')
+
+    def _rotate_state(self):
+        state = self._read_state()
+        _require(isinstance(state, dict) and all(state.get(key) == value for key, value in self._identity().items()),
+                 'campaign receipt belongs to another machine or frozen release')
+        if os.path.lexists(self.upgrade_file):
+            upgrade = json.loads(old._root_bytes(self.upgrade_file, private=True), object_pairs_hook=old._unique_fields)
+            _require(upgrade['phase'] == 'complete', 'campaign source upgrade must finish before rotation')
+        return state
+
+    def rotate_abort(self, candidate_path, expected):
+        from tools.m0_native_mixed.native_adapter import directory_lock
+
+        _require(isinstance(expected, str) and old.HEX.fullmatch(expected),
+                 'explicit reviewed rotation candidate SHA256 is required')
+        state = self._rotate_state()
+        receipt = self._read_rotation()
+        _require(receipt is not None and (receipt['candidate_path'], receipt['candidate_sha256']) == (
+            str(candidate_path), expected), 'rotation abort requires its original candidate path and SHA256')
+        if receipt['phase'] == 'aborted':
+            return self.status() | {'rotation': receipt}
+        _require(receipt['phase'] in ('draining', 'registering', 'aborting'),
+                 'rotation candidate has registered ledger records; resume rotate')
+        _require(receipt['manifest_sha256'] == self.manifest
+                 and state['phase'] in ('enabled', 'paused', 'stopped', 'rotating')
+                 and (state['config_sha256'], state['campaign_id']) ==
+                 (receipt['previous_config_sha256'], receipt['previous_campaign_id']),
+                 'old active campaign receipt drifted during rotation')
+        self._anchored(state)
+        self._check_units()
+        with directory_lock(old.LEDGER.parent, shared=True):
+            fingerprint = _campaign_fingerprint(require_unregistered=receipt)
+        _require(receipt.get('ledger_sha256', fingerprint) == fingerprint,
+                 'prior campaign history changed during rotation')
+        if receipt['phase'] != 'aborting':
+            receipt = self._save_rotation(receipt, 'aborting', ledger_sha256=fingerprint)
+        self._pause_units()
+        self._restore_http(receipt)
+        with directory_lock(old.LEDGER.parent, shared=True):
+            _require(_campaign_fingerprint(require_unregistered=receipt) == fingerprint,
+                     'prior campaign history changed during rotation abort')
+        self._anchored(state)
+        self._save(state, 'paused')
+        aborted = {**receipt, 'phase': 'aborted'}
+        raw = old._json(aborted)
+        for path in self._aborted_identities(aborted):
+            if os.path.lexists(path):
+                _require(old._root_bytes(path, private=True) == raw, 'aborted rotation identity is already reserved')
+            else:
+                old._atomic(path, raw, mode=0o600)
+        receipt = self._save_rotation(receipt, 'aborted')
+        return self.status() | {'rotation': receipt}
+
+    def rotate(self, candidate_path, expected):
+        from . import campaign_runtime as runtime
+
+        _require(isinstance(expected, str) and old.HEX.fullmatch(expected),
+                 'explicit reviewed rotation candidate SHA256 is required')
+        state = self._rotate_state()
+        receipt = self._read_rotation()
+        same = receipt is not None and (receipt['candidate_path'], receipt['candidate_sha256']) == (
+            str(candidate_path), expected)
+        if same and receipt['phase'] == 'complete':
+            self._read_candidate(candidate_path, expected)
+            _require(state['config_sha256'] == expected, 'completed rotation is no longer the active campaign')
+            return self.status() | {'rotation': receipt}
+        _require(not same or receipt['phase'] not in ('aborting', 'aborted'), 'rotation candidate was cancelled')
+        _, candidate = self._read_candidate(candidate_path, expected)
+        if not same:
+            _require(receipt is None or receipt['phase'] in ROTATION_TERMINAL,
+                     'pending campaign rotation requires its original candidate path and SHA256')
+            _require(receipt is None or (receipt['candidate_path'] != str(candidate_path)
+                                         and receipt['candidate_sha256'] != expected),
+                     'completed rotation replay requires its original candidate path and SHA256')
+            current = self.status()
+            self._check_candidate(current, candidate)
+            receipt = self._save_rotation({
+                'schema': ROTATION_SCHEMA, 'machine_id': self.machine, 'manifest_sha256': self.manifest,
+                'candidate_path': str(candidate_path), 'candidate_sha256': expected,
+                'previous_config_sha256': state['config_sha256'], 'previous_campaign_id': state['campaign_id'],
+                'campaign_id': candidate['campaign_id'], 'authorization_id': candidate['authorization_id'],
+                'http_was_active': old._property(old.HTTP, 'ActiveState') == 'active',
+            }, 'draining')
+        _require(receipt['manifest_sha256'] == self.manifest, 'pending rotation is tied to another frozen source')
+        _require(state['phase'] in ('enabled', 'paused', 'stopped', 'rotating')
+                 and state['config_sha256'] in (receipt['previous_config_sha256'], expected),
+                 'active campaign receipt drifted during rotation')
+        config_hash = old._root_hash(runtime.CONFIG)
+        _require(config_hash in (receipt['previous_config_sha256'], expected)
+                 and (receipt['phase'] == 'switching' or config_hash == receipt['previous_config_sha256']),
+                 'active campaign configuration drifted during rotation')
+        config_state = {
+            **state, 'config_sha256': config_hash,
+            'campaign_id': candidate['campaign_id'] if config_hash == expected else receipt['previous_campaign_id'],
+        }
+        self._anchored(config_state)
+        self._check_units()
+        if state['phase'] != 'rotating':
+            state = self._save(state, 'rotating')
+        self._pause_units()
+        if receipt['phase'] == 'draining':
+            self._require_terminal(self._operate('status'))
+            receipt = self._rotation_backup(receipt)
+        self._restore_http(receipt)
+        _require(_campaign_fingerprint(exclude_registration=candidate) == receipt['ledger_sha256'],
+                 'prior campaign history changed during rotation')
+        if receipt['phase'] == 'registering':
+            self._read_candidate(candidate_path, expected)
+            self._candidate_operation(candidate, 'register')
+            receipt = self._save_rotation(receipt, 'switching')
+        campaign = self._candidate_operation(candidate, 'status')
+        _require(campaign['status'] in ('scheduled', 'active', 'expired')
+                 and campaign['request_units_used'] == campaign['request_units_held'] == 0,
+                 'rotation candidate registration or unused budget could not be verified')
+        _require(_campaign_fingerprint(exclude_registration=candidate) == receipt['ledger_sha256'],
+                 'prior campaign history changed during registration')
+        raw, _ = self._read_candidate(candidate_path, expected)
+        if config_hash != expected:
+            _require(old._root_hash(runtime.CONFIG) == config_hash, 'active campaign configuration changed before switch')
+            group = runtime.verify_execution('status')
+            old._atomic(runtime.CONFIG, raw, mode=0o640, gid=group)
+        state = {**state, 'config_sha256': expected, 'campaign_id': candidate['campaign_id'],
+                 'rotation_recovery': receipt['recovery']}
+        self._anchored(state)
+        self._save(state, 'paused')
+        receipt = self._save_rotation(receipt, 'complete')
+        return self.status() | {'rotation': receipt}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument('command', choices=('install', 'guard', 'enable', 'pause', 'stop', 'status', 'upgrade',
-                                           'rotate-check'))
+                                           'rotate-check', 'rotate', 'rotate-abort'))
     parser.add_argument('--expected-machine', required=True)
     parser.add_argument('--manifest-sha256', required=True)
     parser.add_argument('--expected-previous-manifest')
     parser.add_argument('--candidate-config', type=Path)
+    parser.add_argument('--candidate-sha256')
     args = parser.parse_args(argv)
     if (args.command == 'upgrade') != (args.expected_previous_manifest is not None):
         parser.error('--expected-previous-manifest is required for upgrade only')
-    if (args.command == 'rotate-check') != (args.candidate_config is not None):
-        parser.error('--candidate-config is required for rotate-check only')
+    if (args.command in ('rotate-check', 'rotate', 'rotate-abort')) != (args.candidate_config is not None):
+        parser.error('--candidate-config is required for rotation commands only')
+    if (args.command in ('rotate', 'rotate-abort')) != (args.candidate_sha256 is not None):
+        parser.error('--candidate-sha256 is required for rotate and rotate-abort only')
     try:
         _require(sys.platform == 'linux' and os.geteuid() == os.getuid() == 0,
                  'campaign installer requires Linux root')
@@ -550,6 +760,10 @@ def main(argv=None):
                     result = installer.upgrade(args.expected_previous_manifest)
                 elif args.command == 'rotate-check':
                     result = installer.rotate_check(args.candidate_config)
+                elif args.command == 'rotate':
+                    result = installer.rotate(args.candidate_config, args.candidate_sha256)
+                elif args.command == 'rotate-abort':
+                    result = installer.rotate_abort(args.candidate_config, args.candidate_sha256)
                 else:
                     result = getattr(installer, args.command)()
     except Exception as error:

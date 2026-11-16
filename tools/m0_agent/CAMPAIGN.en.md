@@ -10,7 +10,11 @@ The installer verifies the existing baseline, target, and source manifest, and c
 
 Run `upgrade` from the new frozen release with `--expected-machine`, the new `--manifest-sha256`, and `--expected-previous-manifest`. The installer drains current work, verifies a cold recovery copy, and switches the service units. It preserves the grant, task identities, handoffs, and consumed quota, then restores the prior enabled, paused, or stopped phase. Use the same arguments to resume an interrupted upgrade. Ledger or unit drift keeps the startup gate closed.
 
-`rotate-check` takes `--expected-machine`, the current `--manifest-sha256`, and `--candidate-config`. It checks the next grant while the current grant is paused or expired and no requests are held. It validates the candidate configuration, prompts, and identities. Changing or enabling the grant requires a separate operation.
+## Rotate to the next grant
+
+Use `rotate-check` to inspect a candidate. After reviewing its exact bytes, run `rotate` from the current frozen source with `--expected-machine`, `--manifest-sha256`, `--candidate-config`, and `--candidate-sha256`. Rotation verifies a cold recovery copy, preserves the old grant history and budget, and registers the next grant. The next grant starts paused. A separate `enable` starts execution.
+
+Resume an interrupted operation with the same arguments. If the candidate file is missing or its window has expired, `rotate-abort` is available while the candidate is **unregistered**, using the original candidate path and reviewed digest. Cancellation preserves the current configuration and ledger rows and retires the candidate identity. Resume `rotate` with the originally reviewed bytes for a registered candidate.
 
 Run the synthetic tests from the source root:
 

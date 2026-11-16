@@ -1147,11 +1147,11 @@
   },
   "tools/m0_agent/CAMPAIGN.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "ca62f275d0ccdb45958204e3860d1bd5f9e263a9c8d4fa6e6cbd2b58e53378de"
+    "staged_sha256": "4cba95621b54f17130c78db59aa84571d7ba21a79fd381944b8edc7e88e799d4"
   },
   "tools/m0_agent/CAMPAIGN.md": {
     "source": "public preview documentation",
-    "staged_sha256": "52c9c1482c38f9dd418b61efa4bcd54d86482b82e8584809aa089f50cdc94af8"
+    "staged_sha256": "e5b9b50838bc231f85f58c4f38ec914355ebf4c5dbd05d3caff199e11d3fef48"
   },
   "tools/m0_agent/README.en.md": {
     "source": "public preview documentation",
@@ -1181,8 +1181,8 @@
   },
   "tools/m0_agent/campaign_install.py": {
     "source": "tools/m0_agent/campaign_install.py",
-    "source_sha256": "7a582388d54d2b564d73e7963ee2bfd7766e062990b2885e709d125afc40bc8a",
-    "staged_sha256": "7a582388d54d2b564d73e7963ee2bfd7766e062990b2885e709d125afc40bc8a"
+    "source_sha256": "b10f3d519ff4f9be257f62dfd1081fdb24dc8fb5df4a516488cfb1e044fd27e6",
+    "staged_sha256": "b10f3d519ff4f9be257f62dfd1081fdb24dc8fb5df4a516488cfb1e044fd27e6"
   },
   "tools/m0_agent/campaign_runtime.py": {
     "source": "tools/m0_agent/campaign_runtime.py",
@@ -1261,8 +1261,8 @@
   },
   "tools/m0_agent/test_campaign_install.py": {
     "source": "tools/m0_agent/test_campaign_install.py",
-    "source_sha256": "e59f2d0b473d2985916c8126cf06ddcc3afd8b136a77a7ddcfbd3a778b8ab93d",
-    "staged_sha256": "e59f2d0b473d2985916c8126cf06ddcc3afd8b136a77a7ddcfbd3a778b8ab93d"
+    "source_sha256": "88eb664ad679b4b3ce09c228459beb353b6d7a710f1216d735a17d4ffde068d5",
+    "staged_sha256": "88eb664ad679b4b3ce09c228459beb353b6d7a710f1216d735a17d4ffde068d5"
   },
   "tools/m0_agent/test_campaign_recovery.py": {
     "source": "tools/m0_agent/test_campaign_recovery.py",

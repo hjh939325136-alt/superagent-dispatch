@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from contextlib import ExitStack
 from datetime import timedelta
 import json
+from hashlib import sha256
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -240,6 +241,222 @@ class CampaignInstallTests(unittest.TestCase):
             with self.assertRaisesRegex(install.old.InstallError, 'new identities'):
                 self.installer.rotate_check(Path.cwd() / 'fixture-candidate.json')
         self.assertEqual(fixture.f.ledger.read_bytes(), before)
+
+    def test_rotation_recovers_registered_candidate_after_file_drift_and_expiry(self):
+        self._assert_rotation_recovers('registration')
+
+    def test_rotation_recovers_after_active_config_replacement(self):
+        self._assert_rotation_recovers('active_config')
+
+    def test_rotation_recovers_after_paused_state_before_completion_receipt(self):
+        self._assert_rotation_recovers('paused_state')
+
+    def test_rotation_aborts_missing_unregistered_candidate_and_accepts_new_identities(self):
+        self._assert_rotation_recovers('before_registration')
+
+    def _assert_rotation_recovers(self, interrupted_at):
+        from sa_dispatch.campaign_validation import budget_id
+        from sa_dispatch.clock import Clock, timestamp
+        from . import campaign_control, campaign_runtime
+        from .test_campaign_worker import CampaignWorkerTests
+
+        fixture = CampaignWorkerTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        fixture.f.register()
+        fixture.f.tick()
+        fixture.register()
+        for _ in range(3):
+            fixture.tick('producer')
+            fixture.tick('reviewer')
+            fixture.clock.advance(180)
+        self.assertEqual(fixture.status()['request_units_used'], 6)
+
+        active = fixture.f.root / 'active-campaign.json'
+        active.write_bytes(install.old._json(fixture.config))
+        prior_hash = sha256(active.read_bytes()).hexdigest()
+        self.installer.state_file = fixture.f.root / 'state.json'
+        self.installer.upgrade_file = fixture.f.root / 'upgrade.json'
+        self.installer.upgrade_file.write_bytes(b'{"phase":"complete"}')
+        self.installer.rotation_file = fixture.f.root / 'rotate.json'
+        state = self.installer._identity() | {
+            'phase': 'enabled', 'campaign_id': fixture.config['campaign_id'],
+            'ledger_identity': fixture.config['ledger_identity'], 'config_sha256': prior_hash,
+        }
+        self.installer.state_file.write_bytes(install.old._json(state))
+        candidate_file = fixture.f.root / 'reviewed-next.json'
+        future = Clock().now() + timedelta(minutes=5)
+        candidate = fixture.config | {
+            'machine_id': self.machine, 'campaign_id': 'new-campaign', 'authorization_id': 'new-authorization',
+            'starts_at': timestamp(future), 'expires_at': timestamp(future + timedelta(seconds=540)),
+        }
+        approved = install.old._json(candidate)
+        reviewed = sha256(approved).hexdigest()
+        candidate_file.write_bytes(approved)
+
+        def check_anchor(config_state):
+            raw = active.read_bytes()
+            self.assertEqual(sha256(raw).hexdigest(), config_state['config_sha256'])
+            self.assertEqual(json.loads(raw)['campaign_id'], config_state['campaign_id'])
+
+        def use_active(operation):
+            self.assertEqual(operation, 'status')
+            return campaign_control.status(fixture.f.ledger, fixture.f.cas, json.loads(active.read_bytes()))
+
+        def backup(receipt):
+            return self.installer._save_rotation(receipt, 'registering',
+                                                 recovery={'restore_verified': True},
+                                                 ledger_sha256=original_fingerprint)
+
+        real_candidate_operation = self.installer._candidate_operation
+        def interrupt_registration(config, operation):
+            if interrupted_at == 'before_registration' and operation == 'register':
+                candidate_file.unlink()
+                raise KeyboardInterrupt
+            outcome = real_candidate_operation(config, operation)
+            if operation == 'register':
+                candidate_file.unlink()
+                raise KeyboardInterrupt
+            return outcome
+
+        with ExitStack() as stack:
+            patches = (
+                (install.old, 'LEDGER', {'new': fixture.f.ledger}),
+                (install.old, 'CAS', {'new': fixture.f.cas.root}),
+                (install.old, '_root_metadata', {}),
+                (install.old, '_root_bytes', {'side_effect': lambda path, **_: path.read_bytes()}),
+                (install.old, '_root_hash', {'side_effect': lambda path: sha256(path.read_bytes()).hexdigest()}),
+                (install.old, '_atomic', {'side_effect': lambda path, blob, **_: path.write_bytes(blob)}),
+                (install.old, '_property', {'return_value': 'inactive'}),
+                (campaign_runtime, 'CONFIG', {'new': active}),
+                (campaign_runtime, 'verify_execution', {'return_value': 123}),
+                (self.installer, '_operate', {'side_effect': use_active}),
+                (self.installer, '_anchored', {'side_effect': check_anchor}),
+                (self.installer, '_check_units', {}),
+                (self.installer, '_pause_units', {}),
+                (self.installer, '_rotation_backup', {'side_effect': backup}),
+            )
+            for owner, name, kwargs in patches:
+                stack.enter_context(patch.object(owner, name, **kwargs))
+            stack.enter_context(patch('tools.m0_deploy.install_target._read_protected',
+                                      side_effect=lambda path, limit: path.read_bytes()))
+            original_fingerprint = install._campaign_fingerprint()
+
+            def interrupt_after_write(path, blob, **_):
+                path.write_bytes(blob)
+                if interrupted_at == 'active_config' and path == active:
+                    raise KeyboardInterrupt
+                if (interrupted_at == 'paused_state' and path == self.installer.state_file
+                        and json.loads(blob)['phase'] == 'paused'):
+                    raise KeyboardInterrupt
+
+            interruption = (patch.object(self.installer, '_candidate_operation',
+                                         side_effect=interrupt_registration)
+                            if interrupted_at in ('registration', 'before_registration') else
+                            patch.object(install.old, '_atomic', side_effect=interrupt_after_write))
+            with interruption:
+                with self.assertRaises(KeyboardInterrupt):
+                    self.installer.rotate(candidate_file, reviewed)
+            self.assertEqual(self.installer._read_state()['phase'],
+                             'paused' if interrupted_at == 'paused_state' else 'rotating')
+            self.assertEqual(self.installer._read_rotation()['phase'],
+                             'registering' if interrupted_at in ('registration', 'before_registration')
+                             else 'switching')
+            self.assertEqual(sha256(active.read_bytes()).hexdigest(),
+                             prior_hash if interrupted_at in ('registration', 'before_registration') else reviewed)
+            with patch.object(install.old, '_systemctl') as systemctl:
+                for operation in (self.installer.guard, self.installer.enable):
+                    with self.assertRaisesRegex(install.old.InstallError, 'invalid campaign install phase|guard is closed'):
+                        operation()
+                systemctl.assert_not_called()
+            if interrupted_at == 'before_registration':
+                self._assert_abort_and_next_rotation(fixture, active, prior_hash, candidate_file, candidate,
+                                                     reviewed, original_fingerprint)
+                return
+            abandoned_ledger = fixture.f.ledger.read_bytes()
+            with self.assertRaisesRegex(install.old.InstallError, 'registered ledger records'):
+                self.installer.rotate_abort(candidate_file, reviewed)
+            self.assertEqual(fixture.f.ledger.read_bytes(), abandoned_ledger)
+            if interrupted_at == 'registration':
+                with self.assertRaises(FileNotFoundError):
+                    self.installer.rotate(candidate_file, reviewed)
+                candidate_file.write_bytes(approved + b'\n')
+                with self.assertRaisesRegex(install.old.InstallError, 'SHA256 differs'):
+                    self.installer.rotate(candidate_file, reviewed)
+                other = candidate_file.with_name('different-path.json')
+                other.write_bytes(approved)
+                with self.assertRaisesRegex(install.old.InstallError, 'original candidate path'):
+                    self.installer.rotate(other, reviewed)
+                candidate_file.write_bytes(approved)
+            registered_before_resume = fixture.f.ledger.read_bytes()
+            past_window = SimpleNamespace(now=lambda: future + timedelta(days=1))
+            with patch.object(campaign_control, 'Clock', return_value=past_window), \
+                 patch.object(self.installer, '_candidate_operation', wraps=real_candidate_operation) as operation:
+                result = self.installer.rotate(candidate_file, reviewed)
+                self.assertEqual(result['phase'], 'paused')
+                self.assertEqual(result['campaign']['status'], 'expired')
+                self.assertEqual(result['campaign']['request_units_used'], 0)
+                self.assertEqual(result['rotation']['phase'], 'complete')
+                if interrupted_at != 'registration':
+                    self.assertTrue(operation.call_args_list)
+                    self.assertTrue(all(call.args[1] == 'status' for call in operation.call_args_list))
+                self.assertEqual(fixture.f.ledger.read_bytes(), registered_before_resume)
+                before_repeat = fixture.f.ledger.read_bytes()
+                self.assertEqual(self.installer.rotate(candidate_file, reviewed), result)
+                self.assertEqual(fixture.f.ledger.read_bytes(), before_repeat)
+            self.assertEqual(active.read_bytes(), approved)
+            self.assertEqual(install._campaign_fingerprint(exclude_registration=candidate), original_fingerprint)
+            budgets = {row['budget_id']: row['used_units'] for row in fixture.records()['control_budgets']}
+            self.assertEqual(budgets, {'agent-external:provider-request': 1,
+                                       budget_id(fixture.config): 6, budget_id(candidate): 0})
+
+    def _assert_abort_and_next_rotation(self, fixture, active, prior_hash, candidate_path, candidate, reviewed,
+                                        previous_fingerprint):
+        from sa_dispatch.campaign_validation import budget_id
+
+        previous = fixture.f.ledger.read_bytes()
+        self.assertFalse(candidate_path.exists())
+        save_rotation = self.installer._save_rotation
+
+        def interrupt_completion(receipt, phase, **fields):
+            if phase == 'aborted':
+                raise KeyboardInterrupt
+            return save_rotation(receipt, phase, **fields)
+
+        with patch.object(self.installer, '_save_rotation', side_effect=interrupt_completion):
+            with self.assertRaises(KeyboardInterrupt):
+                self.installer.rotate_abort(candidate_path, reviewed)
+        self.assertEqual(self.installer._read_state()['phase'], 'paused')
+        self.assertEqual(self.installer._read_rotation()['phase'], 'aborting')
+        with self.assertRaisesRegex(install.old.InstallError, 'guard is closed'):
+            self.installer.enable()
+        result = self.installer.rotate_abort(candidate_path, reviewed)
+        self.assertEqual(result['rotation']['phase'], 'aborted')
+        self.assertEqual(result['phase'], 'paused')
+        self.assertEqual(result['campaign_id'], fixture.config['campaign_id'])
+        self.assertEqual(sha256(active.read_bytes()).hexdigest(), prior_hash)
+        self.assertEqual(fixture.f.ledger.read_bytes(), previous)
+        with patch.object(install.old, '_atomic') as write:
+            self.assertEqual(self.installer.rotate_abort(candidate_path, reviewed), result)
+            write.assert_not_called()
+        with self.assertRaisesRegex(install.old.InstallError, 'candidate was cancelled'):
+            self.installer.rotate(candidate_path, reviewed)
+
+        next_path = candidate_path.with_name('different-candidate.json')
+        changed_bytes = install.old._json(candidate | {'authorization_id': 'different-authorization'})
+        next_path.write_bytes(changed_bytes)
+        with self.assertRaisesRegex(install.old.InstallError, 'reuses an aborted'):
+            self.installer.rotate(next_path, sha256(changed_bytes).hexdigest())
+        fresh = candidate | {'campaign_id': 'different-campaign', 'authorization_id': 'different-authorization'}
+        fresh_bytes = install.old._json(fresh)
+        next_path.write_bytes(fresh_bytes)
+        replacement = self.installer.rotate(next_path, sha256(fresh_bytes).hexdigest())
+        self.assertEqual(replacement['campaign_id'], fresh['campaign_id'])
+        self.assertEqual(replacement['phase'], 'paused')
+        self.assertEqual(install._campaign_fingerprint(exclude_registration=fresh), previous_fingerprint)
+        budgets = {row['budget_id']: row['used_units'] for row in fixture.records()['control_budgets']}
+        self.assertEqual(budgets, {'agent-external:provider-request': 1,
+                                   budget_id(fixture.config): 6, budget_id(fresh): 0})
 
 
 if __name__ == '__main__':

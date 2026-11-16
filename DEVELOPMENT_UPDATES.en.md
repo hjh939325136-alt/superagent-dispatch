@@ -167,3 +167,12 @@ Timed producer and reviewer jobs can upgrade frozen source while preserving the 
 - The upgrade drains work and verifies a cold recovery copy before switching service units. Ledger or unit drift keeps the startup gate closed.
 - On an isolated Debian VM, the upgrade preserved six units of consumed request quota and three handoffs. Cold recovery, replay with the same arguments, and another normal reboot passed, with zero additional model calls.
 - The rotate-check command performs a read-only preflight for the next grant. Actual rotation and 24-hour steady operation still need validation. The public candidate passed 28 focused tests on each of Windows and Debian.
+
+## 0.1.1-m0.17 (2026-11-16)
+
+Timed producer and reviewer jobs can rotate to a new grant or cancel an unregistered candidate. The new grant starts paused.
+
+- An isolated Debian VM resumed rotation after a process exit following registration. Prior records and budgets were preserved, a repeated command returned the same receipt, and the new grant stayed paused after reboot.
+- Only an unregistered candidate can be canceled. A missing candidate can be canceled using its original path and reviewed digest. Cancellation is idempotent, registered candidates are refused, and the ledger bytes stay identical across cancellation.
+- The initial verification script compared digests across the cold-backup phase. The corrected check verifies prior row digests and compares ledger bytes immediately before and after cancellation. Cold recovery preserved seven tasks, seven attempts, and three handoffs. Collector lag was zero across three streams. Additional model calls: zero.
+- The public candidate passed 32 focused tests on each of Windows and Debian. A 24-hour soak, long-run budgeting, and native agent integration still need validation.
