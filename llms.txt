@@ -2,10 +2,12 @@
 
 > Local task coordination with a SQLite ledger that records claims, progress, and result references. The M0 source preview includes runnable synthetic examples.
 
-## Start here
+## Read the guide or try a demo
 
 - [Agent guide](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/AGENTS.md)
 - [中文快速开始](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/README.md)
 - [English quick start](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/README.en.md)
 - [Technical preview](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/M0_PREVIEW.en.md)
 - [Development updates](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/DEVELOPMENT_UPDATES.en.md)
+- [Agent 指南（简体中文）](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/AGENTS.zh-CN.md)
+- [Hermes comparison and offline tests](https://raw.githubusercontent.com/hjh939325136-alt/superagent-dispatch/refs/heads/preview/m0-source/tools/m0_compare/README.en.md)

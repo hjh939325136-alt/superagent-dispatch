@@ -212,3 +212,12 @@ This preview adds unified offline installation of the shared stack on a fresh De
 - A Debian VM without a virtual NIC resumed from the same package after process termination at seven component receipt boundaries and during offline sealing. It completed one synthetic HTTP task and one local research task and collected eight events. Service restart, reboot, and repeat installation preserved the tasks.
 - Model execution entry points refuse to start in offline mode. Additional model calls: zero. The public source packages built and verified offline. Windows passed 44 focused tests and Debian passed 40.
 - Validation covers fresh offline installation and same-package resume. OS installation, general in-place upgrade, arbitrary migration interruption, conversion to a paid grant, and 24-hour steady operation require separate acceptance.
+
+## 0.1.1-m0.22 (2026-11-16)
+
+Adds an isolated Hermes candidate comparison, known-response ledger reconciliation, and bilingual agent guides.
+
+- The Chinese and English agent guides and llms.txt point to synthetic examples, a self-test, and the verified scope.
+- A complete response and trusted forwarding receipt allow the original task, lease, and ledger to be reconciled with zero provider replays. Host conversation recovery requires separate acceptance.
+- A small live trial used two fixed-worker and 18 Hermes requests. Both passed two summary rounds. The fixed worker lacked retrieval capability, and ordinary retrieval did not deliver. After a transient failure, two current-version reads were verified, while the final output hit the 512-token limit.
+- The server denied restricted tools in both rounds. Denial wording still needs work. Conservative budget predictions blocked some later requests. The experiment stays separate from the default packages, and production adoption remains pending.

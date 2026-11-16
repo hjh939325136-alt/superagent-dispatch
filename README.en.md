@@ -76,6 +76,8 @@ The preview adds [operational observation of the shared coordinator and Collecto
 
 The preview adds [unified offline installation](tools/m0_installer/COMPOSED.en.md) on a fresh Debian system. It prepares the 0013 shared ledger and collection service with model execution blocked.
 
+The preview adds an [isolated Hermes comparison](tools/m0_compare/README.en.md) for a fixed worker and a tool-capable host, using synthetic material, bounded requests, and known-response reconciliation.
+
 ## Current status
 
 One live model slot has been verified with the shared ledger in an isolated VM. See the [development updates](DEVELOPMENT_UPDATES.en.md) for scope.

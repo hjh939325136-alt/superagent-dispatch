@@ -5,7 +5,11 @@
   },
   "AGENTS.md": {
     "source": "public preview documentation",
-    "staged_sha256": "79a624d10b0fec4507a857f0bd4fa2884f6bf41b2e3559be53d0e86d4f2748ff"
+    "staged_sha256": "70031e82353488bfe0d47383035f16bd2f5f94247a65b0ad61c4c89d475a66ad"
+  },
+  "AGENTS.zh-CN.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "39727471a804f9e8d3ab2448f45e2f457661ac05a027db1f4f3073f0494468d1"
   },
   "LICENSE": {
     "source": "exports/SuperAgent-Dispatch-v0.1.0/LICENSE",
@@ -14,19 +18,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "bedc15bb71ecb496b57a4aee217144cf6ff4fd63af189e68fdcf28cab788f3a3"
+    "staged_sha256": "6bc9ca2c57c383357d4f7932c49cc173a8cb110b673870a57b633faedc678f37"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "519a865427ddd70c4a89a7c33e476475a832fe4ab7f1e15c599c206dc54fbd07"
+    "staged_sha256": "a3888a27340084cf3448cc99777f56876717904165ffc4312b08b1db42818069"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "7fc14bf05e6aaa6bc1d895f0ed9bb96b094a49cd8e937e514850f66c2fcdb2b9"
+    "staged_sha256": "7fec9582dcea388a3ab236e70f4d8097f4edd61ce802c6924255b1a661a37b93"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "3e4d15ced24dd41fde8df650d5f38620fff8865b050e741b2dfe5dc0a993c78a"
+    "staged_sha256": "5b0afb94a108a6c631ac18de200f43f87bacc41915fea0fc1c473f3f51847bf0"
   },
   "dispatch/LICENSE": {
     "source": "dispatch/LICENSE",
@@ -1138,7 +1142,7 @@
   },
   "llms.txt": {
     "source": "public preview documentation",
-    "staged_sha256": "997ced4ba22333e33963dd7f09c9d6842367d2c4d1ed1bddb832890fe279cf05"
+    "staged_sha256": "f2d72cc07ea3f24364d43707c52ac7c8a47f777307d4cd5f77aa468294fe94f6"
   },
   "superagent.py": {
     "source": "tools/m0_portable/superagent.py",
@@ -1440,6 +1444,94 @@
     "source": "tools/m0_backup/test_late_audit_checkpoint.py",
     "source_sha256": "fda32dfeced3bc28dbde8799bab15093b4476e1829b96c9696d0b58ad534ed87",
     "staged_sha256": "fda32dfeced3bc28dbde8799bab15093b4476e1829b96c9696d0b58ad534ed87"
+  },
+  "tools/m0_compare/README.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "3d9181762603c46bc3e25b065ee0233097deed38e02ff001aead3311d39a6727"
+  },
+  "tools/m0_compare/README.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "864cca15a189b0179ee04ada75236ef3551f7a2f5cb64c28818fc1f5d47a7a79"
+  },
+  "tools/m0_compare/__init__.py": {
+    "source": "tools/m0_compare/__init__.py",
+    "source_sha256": "90aed8cb36eaaa288d9aa303fa56c9a0edc6bb8e7dae690ca3beaa0bc5ca1745",
+    "staged_sha256": "90aed8cb36eaaa288d9aa303fa56c9a0edc6bb8e7dae690ca3beaa0bc5ca1745"
+  },
+  "tools/m0_compare/broker.py": {
+    "source": "tools/m0_compare/broker.py",
+    "source_sha256": "4640f1a502c3b4a913f27542ed0b2fcaf5ec80589f99c6f11a1f1ed55d1bf19e",
+    "staged_sha256": "4640f1a502c3b4a913f27542ed0b2fcaf5ec80589f99c6f11a1f1ed55d1bf19e"
+  },
+  "tools/m0_compare/fixture_tools.py": {
+    "source": "tools/m0_compare/fixture_tools.py",
+    "source_sha256": "7f0257b046a16a22c9c1bac79d3c9129aa75bfac1a0039a7141dca75aedb7379",
+    "staged_sha256": "7f0257b046a16a22c9c1bac79d3c9129aa75bfac1a0039a7141dca75aedb7379"
+  },
+  "tools/m0_compare/hermes_host.py": {
+    "source": "tools/m0_compare/hermes_host.py",
+    "source_sha256": "30935763bfa9daff8203afb2de700db834b233803cd1e9cce59cc0409bb492c8",
+    "staged_sha256": "30935763bfa9daff8203afb2de700db834b233803cd1e9cce59cc0409bb492c8"
+  },
+  "tools/m0_compare/host_process.py": {
+    "source": "tools/m0_compare/host_process.py",
+    "source_sha256": "a30c1072171621215ea43ae241efe56f4dd450d525e54069a8398dedb104cb29",
+    "staged_sha256": "a30c1072171621215ea43ae241efe56f4dd450d525e54069a8398dedb104cb29"
+  },
+  "tools/m0_compare/isolation.py": {
+    "source": "tools/m0_compare/isolation.py",
+    "source_sha256": "97a315371189243d536d7f6993c7f252ea86ee79adaef6207fa27a94668c83c4",
+    "staged_sha256": "97a315371189243d536d7f6993c7f252ea86ee79adaef6207fa27a94668c83c4"
+  },
+  "tools/m0_compare/money_guard.py": {
+    "source": "tools/m0_compare/money_guard.py",
+    "source_sha256": "64b4ec2cafd76936a3123906b6ca601daebab2d5003f6b0c54fe190074a72e52",
+    "staged_sha256": "fa1131dab82b0316eb3dcb6c82f38060a695f33bb474044fa2e028da14c240e8"
+  },
+  "tools/m0_compare/request_ledger.py": {
+    "source": "tools/m0_compare/request_ledger.py",
+    "source_sha256": "e819a88ede48d097a17bc1d6aa11c23a1a1a3f0335877a0f284807093a669a73",
+    "staged_sha256": "e819a88ede48d097a17bc1d6aa11c23a1a1a3f0335877a0f284807093a669a73"
+  },
+  "tools/m0_compare/socket_service.py": {
+    "source": "tools/m0_compare/socket_service.py",
+    "source_sha256": "39f7052e16fc83c9cbbd0f64543e9035c8f40bff26e754b3e39a5914a881bb54",
+    "staged_sha256": "39f7052e16fc83c9cbbd0f64543e9035c8f40bff26e754b3e39a5914a881bb54"
+  },
+  "tools/m0_compare/test_broker.py": {
+    "source": "tools/m0_compare/test_broker.py",
+    "source_sha256": "02e1822d6ebd9fb3e285f88fb2c9be7fa1f7704c6eb23f7ca162ab26247d100d",
+    "staged_sha256": "02e1822d6ebd9fb3e285f88fb2c9be7fa1f7704c6eb23f7ca162ab26247d100d"
+  },
+  "tools/m0_compare/test_fixture_tools.py": {
+    "source": "tools/m0_compare/test_fixture_tools.py",
+    "source_sha256": "f02fb10d2504dc86046180f8a39338cbe2e4de3efb1335464937e162eb464d2a",
+    "staged_sha256": "f02fb10d2504dc86046180f8a39338cbe2e4de3efb1335464937e162eb464d2a"
+  },
+  "tools/m0_compare/test_hermes_host.py": {
+    "source": "tools/m0_compare/test_hermes_host.py",
+    "source_sha256": "c2ae127cb15add3d6303db98ad9273c7955cce6c0d2a0ca7c8b912df50580bce",
+    "staged_sha256": "c2ae127cb15add3d6303db98ad9273c7955cce6c0d2a0ca7c8b912df50580bce"
+  },
+  "tools/m0_compare/test_isolation.py": {
+    "source": "tools/m0_compare/test_isolation.py",
+    "source_sha256": "77f70b42cdd4b06637e5751168a37f954aaba57792aaa41484f0ba182bab5fd9",
+    "staged_sha256": "77f70b42cdd4b06637e5751168a37f954aaba57792aaa41484f0ba182bab5fd9"
+  },
+  "tools/m0_compare/test_money_guard.py": {
+    "source": "tools/m0_compare/test_money_guard.py",
+    "source_sha256": "6e73952857988156bc20df6c8143ef820503ece903361650468f723e13668e4b",
+    "staged_sha256": "6e73952857988156bc20df6c8143ef820503ece903361650468f723e13668e4b"
+  },
+  "tools/m0_compare/test_request_ledger.py": {
+    "source": "tools/m0_compare/test_request_ledger.py",
+    "source_sha256": "2c1df13ffee69d5fb3523d887baa7c018c15cac396fc6ed99acfb55355766f17",
+    "staged_sha256": "2c1df13ffee69d5fb3523d887baa7c018c15cac396fc6ed99acfb55355766f17"
+  },
+  "tools/m0_compare/test_socket_service.py": {
+    "source": "tools/m0_compare/test_socket_service.py",
+    "source_sha256": "884de060c5c99e2fef49eec7168ffdf2c6f78908e16af9c0e56d4968a068cb1d",
+    "staged_sha256": "884de060c5c99e2fef49eec7168ffdf2c6f78908e16af9c0e56d4968a068cb1d"
   },
   "tools/m0_deploy/__init__.py": {
     "source": "tools/m0_deploy/__init__.py",

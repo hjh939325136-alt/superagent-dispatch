@@ -1,6 +1,6 @@
 # SuperAgent 开发预览
 
-**简体中文** · [Read in English](README.en.md) · [Agent 指南](AGENTS.md) · [文档索引](llms.txt)
+**简体中文** · [Read in English](README.en.md) · [Agent 指南](AGENTS.zh-CN.md) · [文档索引](llms.txt)
 
 **SuperAgent 帮你把几个工具串起来做一件事，并能回查每一步。** 它在本机记录任务由谁领取、进展如何、结果放在哪里。
 
@@ -75,6 +75,8 @@ Manager 新增[运行状态与交接回读](tools/m0_manager/README.md)。在显
 新增[共同协调器和 Collector 运行观察](tools/m0_manager/SOAK.md)。开发 VM 已启动 24 小时观察窗口，尚待完整窗口验收。
 
 新增[共同运行栈统一离线安装](tools/m0_installer/COMPOSED.md)。在新 Debian 环境中建立 0013 共同账本和采集服务，模型执行门保持关闭。
+
+新增[隔离 Hermes 候选对照](tools/m0_compare/README.md)：在合成资料和显式预算边界内比较固定 Worker 和工具型宿主，并核对可信的已知响应。
 
 ## 当前进度
 
