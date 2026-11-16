@@ -49,6 +49,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 这版新增独立的中央维护入口，可在已激活的本机合成混合账本上设置共享预算、记录交接并查看状态。任务的领取、审批和最终结算继续走各自的执行路由。[中央维护用法](dispatch/docs/design/central_control.md)
 
+离线检查点现在可以经逐条审查保留受支持的未采信迟到回执。它们仍是历史审计记录，不能用来确认任务完成。合成测试还验证了 Collector 从 `0011` 到 `0012` 时如何冻结旧游标并逐流接续。
+
 ## 当前进度
 
 公开版在 Windows 和隔离 Debian 上跑过本机样例。演示用合成资料和模拟审核。现役服务尚未采用这些更新，完整系统上线、跨设备执行、24 小时连续运行和真实数据库迁移仍待验证。

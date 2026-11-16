@@ -28,6 +28,10 @@ Collector `sync` and `adopt`, including calls through `manager sync` and `manage
 
 `ok: true` means the command was processed. Check `result.state` for the actual sync outcome. If the stream is `frozen`, the operator should inspect the source and gap before deciding whether to explicitly resume with `adopt`. Source authorization and login identity are separate from the version field.
 
+### Continuing collection from 0011 to 0012
+
+The synthetic test starts at the actual `0011` migration prefix. After the `0012` upgrade, the old binding freezes, and replacing the trusted binding leaves the stream frozen. Use read-only Manager queries to check backlog and prior anchors before explicitly adopting each stream with `accept_schema`. `projection_lag=0` on a frozen response does not establish an empty backlog. This update adds upgrade coverage. Collector runtime code stays the same. An older `0011` ledger alone lacks the material and evidence needed for complete domain recovery.
+
 ## Isolated and mixed execution
 
 Ledger schema `0012` adds optional mixed mode, and the export format moves to `bundle.v7`. In mixed mode, local research and content commands and a loopback HTTP coordinator can use one ledger while claiming their own routed tasks. Manager can query compatible synthetic `0012` ledgers read-only. Activation is an explicit maintenance action that checks evidence against the ledger's current state. The regular examples remain in isolated mode.
@@ -53,6 +57,8 @@ Historical access is read-only by default. An explicit synthetic rehearsal can c
 Starting in `0.1.1-m0.8`, checkpoints preserve settled schedule history and pinned references used only by current or frozen templates. `schedule-status` uses a read-only connection to show plans, slots, and events across all captured routes. Original enabled flags, versions, and task rows are preserved. The flags describe history and grant no permission to run. Recovery rejects `schedule-tick` and `schedule-upsert`. Schedule events are deduplicated aggregates with limited evidence about individual slots.
 
 This scope covers settled standard read-only `hotspot.topic_fetch@1` plans on the complete current schema. Pending reservations, custom kinds, incomplete older schemas, active work, and restarting production scheduling remain unsupported. Use `0.1.1-m0.8` or a later compatible tool to read domain checkpoints with schedule history. Ordinary v7 eligibility stays the same.
+
+Starting in `0.1.1-m0.10`, an explicit per-row review can preserve two synthetic `ignored` audit profiles: `runtime_fixture` for a terminal read-only task's old fence, and `recovery_ignored_claim` for a guarded unknown task's current fence. Original rows, classifications, and CAS objects are preserved. They cannot be used as reconciliation evidence. Ordinary v7 continues to reject all late receipts.
 
 The [offline recovery guide](tools/m0_backup/README.md#offline-synthetic-recovery) contains the demo command.
 

@@ -31,6 +31,7 @@ from sa_dispatch.migrations import apply_m0_schema
 from sa_dispatch.models import DispatchError
 from sa_dispatch.routing import LOCAL_ROUTE, ROUTED_TABLES, ROUTES, validate_mixed_records
 
+from .late_audit_checkpoint import LateAuditError, inventory as late_audit_inventory
 from .schedule_checkpoint import ScheduleHistoryError, validate_history as validate_schedule_history
 
 
@@ -248,8 +249,10 @@ def _binding_objects(paths, *, live_root=None):
     return original_workflow, identities
 
 
-def _ledger(paths):
+def _ledger(paths, *, verify_schema=False):
     with closing(_open_database(paths['dispatch.sqlite3'])) as db:
+        if verify_schema:
+            _digest_image(db, 'dispatch.sqlite3')
         return bundle.snapshot_records(db)
 
 
@@ -269,7 +272,6 @@ def _ledger_admission(records, binding, cas):
              all(row['access'] == 'synthetic' for row in records['evidence']) and
              all(row['class'] != 'local_only' for row in records['unified_events']),
              'checkpoint requires synthetic no-egress tasks and evidence')
-    _require(not records['late_results'], 'checkpoint does not support populated late_results')
     try:
         schedule_refs = validate_schedule_history(records)
     except ScheduleHistoryError as error:
@@ -585,18 +587,36 @@ def _dispatch_refs(records, domain_refs, schedule_refs):
     return roots
 
 
-def _inventory(paths, cas, *, live_root=None):
+def _review_late_rows(records, tasks, allowed, cas):
+    try:
+        return late_audit_inventory(records, tasks, allowed, cas)
+    except LateAuditError as error:
+        raise CheckpointError(str(error)) from error
+
+
+def _same_late_review(expected, supplied):
+    try:
+        return expected == supplied and archive.canonical(expected) == archive.canonical(supplied)
+    except (TypeError, ValueError, RecursionError):
+        return False
+
+
+def _inventory(paths, cas, *, live_root=None, late_audit_review=None):
     binding, identities = _binding_objects(paths, live_root=live_root)
     records = _ledger(paths)
     tasks, requests, allowed, schedule_refs = _ledger_admission(records, binding, cas)
+    late_review, late_roots = _review_late_rows(records, tasks, allowed, cas)
+    _require(_same_late_review(late_review, late_audit_review),
+             'checkpoint requires an exact ignored late receipt audit review')
     research_refs, contexts, catalog_receipts = _research_state(binding)
     content_refs, content_receipts = _content_state(binding, contexts)
     roots = _domain_receipts(binding, cas, tasks, requests, catalog_receipts + content_receipts)
     roots.update(_dispatch_refs(records, research_refs | content_refs, schedule_refs))
     roots.update(bundle._artifact_roots(records, include_fixed_refs=False))
+    roots.update(late_roots)
     refs = bundle._known_artifact_inventory(records, cas, roots)
     files = {cas.path(ref).relative_to(cas.root.parent).as_posix(): cas.get(ref) for ref in refs}
-    return identities, allowed, files
+    return identities, allowed, files, late_review
 
 
 def _paths(root, layout):
@@ -613,11 +633,25 @@ def _fixed_bytes(paths):
     return {name: archive._read(paths[name], archive.META_LIMIT)[0] for name in paths if name not in DATABASES}
 
 
-def capture_checkpoint(source_root, destination, *, stopped_processes, creator, code_revision):
+def review_late_audit(source_root):
+    """Read the exact ignored late receipt review for an owned prepared fixture, or return None."""
+    source = Path(source_root)
+    archive._stat(source, directory=True)
+    paths = _paths(source, LAYOUT)
+    cas = _CheckpointCAS(source / 'artifacts')
+    binding, _ = _binding_objects(paths, live_root=source)
+    records = _ledger(paths, verify_schema=True)
+    tasks, _, allowed, _ = _ledger_admission(records, binding, cas)
+    late_review, _ = _review_late_rows(records, tasks, allowed, cas)
+    return late_review
+
+
+def capture_checkpoint(source_root, destination, *, stopped_processes, creator, code_revision, late_audit_review=None):
     """Capture an exclusively owned offline ``prepare`` fixture and return its manifest SHA-256.
 
     The caller owns the complete fixture and all its writers. Exited subprocess
     evidence and unchanged captures do not establish global writer exclusion.
+    For ignored late audit rows, supply the exact descriptor from review_late_audit.
     The output is a new directory. Keep the returned anchor as trusted metadata.
     """
     source = Path(source_root)
@@ -634,15 +668,18 @@ def capture_checkpoint(source_root, destination, *, stopped_processes, creator, 
         image_paths = _paths(staged, {key: key for key in LAYOUT})
         before = _database_digests(paths)
         fixed = _fixed_bytes(paths)
-        source_inventory = _inventory(paths, _CheckpointCAS(source / 'artifacts'), live_root=source)
+        source_inventory = _inventory(paths, _CheckpointCAS(source / 'artifacts'), live_root=source,
+                                      late_audit_review=late_audit_review)
         for name in DATABASES:
             _backup_database(paths[name], image_paths[name])
-        identities, allowed, cas_files = source_inventory
+        identities, allowed, cas_files, late_review = source_inventory
         for name, raw in {**fixed, **cas_files}.items():
             _write_bytes(staged / name, raw)
         _require(before == _database_digests(image_paths) == _database_digests(paths) and fixed == _fixed_bytes(paths) and
-                 source_inventory == _inventory(paths, _CheckpointCAS(source / 'artifacts'), live_root=source) and
-                 source_inventory == _inventory(image_paths, _CheckpointCAS(staged / 'artifacts')),
+                 source_inventory == _inventory(paths, _CheckpointCAS(source / 'artifacts'), live_root=source,
+                                                late_audit_review=late_audit_review) and
+                 source_inventory == _inventory(image_paths, _CheckpointCAS(staged / 'artifacts'),
+                                                late_audit_review=late_audit_review),
                  'source changed during capture or backup image differs from source')
         files = {}
         for name in sorted((*LAYOUT, *cas_files)):
@@ -653,6 +690,8 @@ def capture_checkpoint(source_root, destination, *, stopped_processes, creator, 
                     'creator': creator, 'code_revision': code_revision, 'quiescence': quiescence,
                     'databases': before, 'revocation': REVOCATION, 'bindings': identities,
                     'allowed_unknown_task_ids': allowed, 'files': files}
+        if late_review is not None:
+            manifest['late_audit_review'] = late_review
         raw_manifest = archive.canonical(manifest) + b'\n'
         _write_bytes(staged / archive.MANIFEST_NAME, raw_manifest)
         anchor = archive._digest(raw_manifest)
@@ -684,7 +723,10 @@ def restore_checkpoint(package_root, destination, *, expected_manifest_sha256, m
         archive._verify_package(staged, verified)
         paths = _paths(staged, {name: name for name in LAYOUT})
         _require(_database_digests(paths) == verified.get('databases'), 'normalized SQLite image digest mismatch')
-        identities, allowed, cas = _inventory(paths, _CheckpointCAS(staged / 'artifacts'))
+        _require('late_audit_review' not in verified or verified['late_audit_review'] is not None,
+                 'invalid ignored late receipt audit review in checkpoint manifest')
+        identities, allowed, cas, _late_review = _inventory(paths, _CheckpointCAS(staged / 'artifacts'),
+                                                            late_audit_review=verified.get('late_audit_review'))
         _require(identities == verified['bindings'] and allowed == verified['allowed_unknown_task_ids'] and
                  set(verified['files']) == set(LAYOUT) | set(cas),
                  'checkpoint manifest differs from admitted binding, task or CAS inventory')

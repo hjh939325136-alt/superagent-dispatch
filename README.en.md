@@ -49,6 +49,8 @@ Offline recovery also preserves settled scheduling history. Restored schedules a
 
 A separate central maintenance entry point can configure shared budgets, record handoffs, and inspect status on an activated local synthetic mixed ledger. Task claims, approvals, and final settlement stay with their execution routes. See the [central maintenance guide](dispatch/docs/design/central_control.en.md).
 
+Offline checkpoints can now preserve supported ignored late receipts after an explicit per-row review. They remain audit history and cannot establish task completion. A synthetic test also verifies freezing and explicitly resuming each Collector stream across `0011` to `0012`.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. The running service has yet to adopt these updates. Production rollout, cross-device execution, continuous operation, and migration of real databases still need separate validation.

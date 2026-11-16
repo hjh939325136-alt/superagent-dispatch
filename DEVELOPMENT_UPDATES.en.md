@@ -73,3 +73,11 @@ Activated local synthetic mixed ledgers now have a dedicated central maintenance
 - Trusted local callers explicitly select central maintenance and supply the expected activation evidence. Both routes continue to share the ledger budget. A limit update preserves spent and held usage.
 - Status is read-only. Explicit expiry affects just the named handoff. A due legacy record can expire without granting authority to accept or complete it.
 - Authorization, receipts, and outputs stay bound to their original handoff. Completed handoffs passed export, verification, and restore tests. This entry point runs no tasks and sends no messages.
+
+## 0.1.1-m0.10 (2026-11-16)
+
+Offline checkpoints can preserve two reviewed kinds of ignored late audit. The preview also adds Collector upgrade coverage from 0011 to 0012.
+
+- Original audit rows and evidence objects are preserved as ignored. A late claim cannot establish completion. The rehearsal confirms history through the original invocation’s read-only lookup.
+- Collector freezes the old binding after upgrade. Check backlog and anchors before explicitly adopting each stream. The tests confirm existing projections stay intact and repeat sync adds no duplicates. Collector runtime code stays the same.
+- Ordinary v7 still rejects every late receipt. An older 0011 ledger alone remains insufficient for complete domain recovery. The running service has yet to adopt the update.
