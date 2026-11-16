@@ -72,6 +72,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 Manager 新增[运行状态与交接回读](tools/m0_manager/README.md)。在显式绑定的 0013 共同账本上查看服务健康和单条交接的账本证据。
 
+新增[共同协调器和 Collector 运行观察](tools/m0_manager/SOAK.md)。开发 VM 已启动 24 小时观察窗口，尚待完整窗口验收。
+
 ## 当前进度
 
 共同账本的隔离虚拟机已验证一个实际模型时间槽。验收范围见[开发更新](DEVELOPMENT_UPDATES.md)。

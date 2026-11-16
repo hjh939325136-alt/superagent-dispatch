@@ -72,6 +72,8 @@ The preview adds a [resident Collector for Debian](tools/m0_agent/COLLECTOR.en.m
 
 Manager adds [operational and handoff queries](tools/m0_manager/README.en.md) for service health and single-handoff ledger evidence on an explicitly bound 0013 shared ledger.
 
+The preview adds [operational observation of the shared coordinator and Collector](tools/m0_manager/SOAK.en.md). The development VM started a 24-hour window, with full-window validation pending.
+
 ## Current status
 
 One live model slot has been verified with the shared ledger in an isolated VM. See the [development updates](DEVELOPMENT_UPDATES.en.md) for scope.

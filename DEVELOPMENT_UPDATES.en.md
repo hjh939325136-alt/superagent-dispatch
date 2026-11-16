@@ -194,3 +194,12 @@ Manager adds read-only ops.snapshot and handoff.get for operational observations
 - The handoff query verifies ledger hash linkage, reports partial coverage, and marks CAS content integrity as unchecked.
 - The stdin CLI checked service health and three existing handoff chains in an isolated Debian VM. Database and WAL bytes and modification times matched before and after. Additional model calls: zero.
 - The public candidate passed 47 tests on each of Windows and Debian. Native product session integration and 24-hour steady operation still need validation.
+
+## 0.1.1-m0.20 (2026-11-16)
+
+The preview adds a 24-hour observation entry point for the shared coordinator and Collector, with startup validated on an isolated Debian VM.
+
+- The observer samples through the read-only Manager path. A record is capped at 512 samples and 512 KiB. The journal rate limit controls write rate.
+- The isolated VM recorded two good natural samples, and repeated enable kept the original start and deadline. The window was still running when checked. The 24-hour result is pending.
+- Observation covers the shared coordinator and Collector. Model timers stayed disabled, prior tasks, attempts, and handoffs were preserved, and no new model calls occurred.
+- Windows passed 39 tests with one Linux-only lock test skipped. Debian passed 40. Simulated clock and pause-race tests verified decision logic and lock ordering.
