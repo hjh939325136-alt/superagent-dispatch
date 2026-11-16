@@ -60,6 +60,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 这版预览还包含一套[实验维护工具](tools/m0_native_mixed/README.md)，用于暂存合成研究与内容目录，以及演练混合模式切换中断后的接续。现场采集接续仍待验收。
 
+预览新增[单次模型任务示例](tools/m0_agent/README.md)。开发者可以演练如何把一份获准的合成文本绑定到一个时间槽，由本机工作器领取，再回查结果与 token 用量。模拟超时会把任务标成待核实，以避免自动重复发送。
+
 ## 当前进度
 
 目前公开的是单机样例和实验维护工具。最新的适配器与安装演练进度见[开发更新](DEVELOPMENT_UPDATES.md)。

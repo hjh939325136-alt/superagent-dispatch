@@ -16,4 +16,4 @@ python -X utf8 -B -m unittest tools.m0_native_mixed.test_domains tools.m0_native
 
 测试使用临时目录、真实 SQLite/CAS 与激活事务，以及合成服务和恢复适配器。24 个异常中断位置模拟运行中断，实机断电仍待验证。Unix 文件所有权用例在 Windows 按平台跳过。
 
-真实 Debian 适配器、完整恢复集、systemd 启动门禁和 Collector 现场接续仍待完成。专属沙盒当前仍运行在隔离模式。
+工具包用于合成演练。开发环境中的适配器进度请见[开发更新](../../DEVELOPMENT_UPDATES.md)。

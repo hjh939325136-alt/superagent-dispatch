@@ -80,6 +80,8 @@ This public source preview was tested with local synthetic examples on Windows a
 
 The [maintenance toolkit](tools/m0_native_mixed/README.en.md) stages a separate synthetic domain and coordinates one mixed-mode activation through persistent phases. Tests use real SQLite, CAS, and activation transactions with synthetic service and recovery adapters. Exceptions simulate interruption at 24 points. The public toolkit covers simulated scenarios. Physical power loss, actual systemd start guards, and live Collector adoption still need validation.
 
+The preview includes a [one-shot model task example](tools/m0_agent/README.en.md). Developers can bind approved synthetic text to a time slot, let a local worker claim it, and inspect its result and token usage. A simulated timeout leaves the outcome unknown to prevent automatic resubmission.
+
 ## Sandbox and delivery progress
 
 Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.

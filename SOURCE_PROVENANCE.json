@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "ee1d24c81d33513655db373389f4439dedf06e34597011de6483d54381df5be5"
+    "staged_sha256": "26cfb55d18cb1ca3a27bb006e3935f3287e191cd90ba3042cd94851e792f22af"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5ee300329bc7877496433c91f0015cc9debf37dc08a6c8d8f8412e8f85a5cc53"
+    "staged_sha256": "b217d66192b58cbdefd56e32aebed54eb65c38fb59e6d392ffb1ddf18d82db1b"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "707b025b682e4282b32885ff55fe9b61b17b7d9f3bca5a605683286b4fbc60f3"
+    "staged_sha256": "a5cb1f2ee435b735500d2c9978d761f270c89e1bf72c4ebbd52980e77f6341de"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "f5753eadbac3aad5a28cd63b6309c92b7f14323f2cd9f4ac3ec4858aa4367b7d"
+    "staged_sha256": "a85826344f841d7438e7d92d475d792eb857ea29ad4ec013787ce95146ed6369"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -214,8 +214,8 @@
   },
   "dispatch/sa_dispatch/scheduler.py": {
     "source": "dispatch/sa_dispatch/scheduler.py",
-    "source_sha256": "87963ad02115d9f7bb9a1e814ecc895154ad7dcc7e54a03ea6c1b2bb68970134",
-    "staged_sha256": "87963ad02115d9f7bb9a1e814ecc895154ad7dcc7e54a03ea6c1b2bb68970134"
+    "source_sha256": "9747b307fbf81a9b6b4d1861b8bf61c3b2c24cd6b0e9af1f20bfb79de696ba09",
+    "staged_sha256": "9747b307fbf81a9b6b4d1861b8bf61c3b2c24cd6b0e9af1f20bfb79de696ba09"
   },
   "dispatch/sa_dispatch/schema.sql": {
     "source": "dispatch/sa_dispatch/schema.sql",
@@ -239,8 +239,8 @@
   },
   "dispatch/sa_dispatch/store_sqlite.py": {
     "source": "dispatch/sa_dispatch/store_sqlite.py",
-    "source_sha256": "7242a9a83828e79c1a57f38cd361da5f3e1ab884cead25a90be7020072545f27",
-    "staged_sha256": "7242a9a83828e79c1a57f38cd361da5f3e1ab884cead25a90be7020072545f27"
+    "source_sha256": "b585544e79f185a00471aa1fdff0f9d54b21b45c79e87fd99457ccd5764ec99a",
+    "staged_sha256": "b585544e79f185a00471aa1fdff0f9d54b21b45c79e87fd99457ccd5764ec99a"
   },
   "dispatch/sa_dispatch/transport.py": {
     "source": "dispatch/sa_dispatch/transport.py",
@@ -1102,6 +1102,49 @@
     "source_sha256": "c800aaf5d7f0b25d1d38f5a05395f38392d7828d4a0c57d0bf205c838bdcdd55",
     "staged_sha256": "c800aaf5d7f0b25d1d38f5a05395f38392d7828d4a0c57d0bf205c838bdcdd55"
   },
+  "tools/m0_agent/README.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "d20a4348248be3a4ed81b7ed55772c756c80d02e676499344ed7a4177a981f14"
+  },
+  "tools/m0_agent/README.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "541fda980501066260d2c6027b6ebe251b1212ff9fe9f60dac26e9dbbc60f696"
+  },
+  "tools/m0_agent/__init__.py": {
+    "source": "tools/m0_agent/__init__.py",
+    "source_sha256": "7adebee9fb56bcd2fb144c714ba8e37fa3ffd2298a6ff94e687de0b92012d7d0",
+    "staged_sha256": "7adebee9fb56bcd2fb144c714ba8e37fa3ffd2298a6ff94e687de0b92012d7d0"
+  },
+  "tools/m0_agent/deepseek_client.py": {
+    "source": "tools/m0_agent/deepseek_client.py",
+    "source_sha256": "43ca5adacc4bbc4c5feddc4a091f5947eeb7089741244d28cf6c382f62bde6e5",
+    "staged_sha256": "43ca5adacc4bbc4c5feddc4a091f5947eeb7089741244d28cf6c382f62bde6e5"
+  },
+  "tools/m0_agent/provider_process.py": {
+    "source": "tools/m0_agent/provider_process.py",
+    "source_sha256": "07dfbd91e396966b136767f262d1454d0aa02705fff96726445b0393ea9da7d1",
+    "staged_sha256": "07dfbd91e396966b136767f262d1454d0aa02705fff96726445b0393ea9da7d1"
+  },
+  "tools/m0_agent/test_deepseek_client.py": {
+    "source": "tools/m0_agent/test_deepseek_client.py",
+    "source_sha256": "dc7d81ec5de2e91b008e04fedb76fb7f496e9c3476bdcf64cbd47d79460e8dd3",
+    "staged_sha256": "dc7d81ec5de2e91b008e04fedb76fb7f496e9c3476bdcf64cbd47d79460e8dd3"
+  },
+  "tools/m0_agent/test_provider_process.py": {
+    "source": "tools/m0_agent/test_provider_process.py",
+    "source_sha256": "39e5beda12fbd9d34ee052b5bd953a693ae20a1e96047abee1c3fc39ff06ea01",
+    "staged_sha256": "39e5beda12fbd9d34ee052b5bd953a693ae20a1e96047abee1c3fc39ff06ea01"
+  },
+  "tools/m0_agent/test_worker.py": {
+    "source": "tools/m0_agent/test_worker.py",
+    "source_sha256": "adeda643255c4cfce8f4f0d6764fa5d361364c714b306a48646f96beb72d330e",
+    "staged_sha256": "adeda643255c4cfce8f4f0d6764fa5d361364c714b306a48646f96beb72d330e"
+  },
+  "tools/m0_agent/worker.py": {
+    "source": "tools/m0_agent/worker.py",
+    "source_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e",
+    "staged_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e"
+  },
   "tools/m0_backup/README.md": {
     "source": "public preview documentation",
     "staged_sha256": "96fecf8114b6b0db72ebda6f3e3e93ed732c1c607219e66f9ae2cd535e5e97c3"
@@ -1248,11 +1291,11 @@
   },
   "tools/m0_native_mixed/README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "06e64d03d8a94cab055da3df234b33d047bb77423cf75e6cb606e771f5da523c"
+    "staged_sha256": "59b365aa1f0b4eb6ce164af0a1f0308a3aa93908f47e8d7631de8a5c0e0d105a"
   },
   "tools/m0_native_mixed/README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "e4cbc2a3b290676a3500f97104b40bf5faa66e28858f6851e1ebccfc6b65ba11"
+    "staged_sha256": "30be84c1d3cf3ed895e146b49da6da3483a5d5afcbfd15a5b3d8edada9fac770"
   },
   "tools/m0_native_mixed/__init__.py": {
     "source": "tools/m0_native_mixed/__init__.py",

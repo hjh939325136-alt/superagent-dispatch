@@ -206,7 +206,7 @@ class Scheduler:
             self._event(conn, {'id':firing['schedule_id'],'version':firing['version']},
                         'schedule.rejected' if rejected else 'schedule.retry_scheduled', now, code)
 
-    def tick(self, *, limit=100, synthetic_handoff=False):
+    def tick(self, *, limit=100, synthetic_handoff=False, schedule_id=None):
         """Reserve bounded due slots and recover pending submissions.
 
         Disabling a schedule stops future reservations, not already reserved jobs.
@@ -214,11 +214,14 @@ class Scheduler:
         """
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise DispatchError('tick limit must be between 1 and 1000')
+        if schedule_id is not None and (not isinstance(schedule_id, str)
+                or not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}', schedule_id)):
+            raise DispatchError('invalid schedule id')
         now = self.store._now()
         if self._sqlite_pause_until and now < self._sqlite_pause_until:
             return []
         try:
-            result = self._tick(limit=limit, synthetic_handoff=synthetic_handoff)
+            result = self._tick(limit=limit, synthetic_handoff=synthetic_handoff, schedule_id=schedule_id)
         except sqlite3.OperationalError as error:
             if not self._busy(error):
                 raise
@@ -233,17 +236,21 @@ class Scheduler:
         self._sqlite_pause_until = None
         return result
 
-    def _tick(self, *, limit, synthetic_handoff):
+    def _tick(self, *, limit, synthetic_handoff, schedule_id=None):
         now = self.store._now()
         route = self.store.route
         synthetic_handoff = synthetic_handoff or route == HTTP_ROUTE
+        scope_params = () if schedule_id is None else (schedule_id,)
+        firing_filter = '' if schedule_id is None else ' AND schedule_id=?'
+        schedule_filter = '' if schedule_id is None else ' AND id=?'
         with self.store._tx(execution=True) as conn:
             pending = conn.execute("""SELECT COUNT(*) FROM schedule_firings WHERE outcome='pending'
-                AND execution_route IS ? AND (next_attempt_at IS NULL OR next_attempt_at<=?)""",
-                (route, now)).fetchone()[0]
+                AND execution_route IS ? AND (next_attempt_at IS NULL OR next_attempt_at<=?)""" + firing_filter,
+                (route, now, *scope_params)).fetchone()[0]
             capacity = max(0, limit - pending)
-            rows = conn.execute('''SELECT * FROM schedules WHERE enabled=1 AND execution_route IS ?
-                ORDER BY next_fire_at,id''', (route,)).fetchall()
+            rows = conn.execute('SELECT * FROM schedules WHERE enabled=1 AND execution_route IS ?'
+                                + schedule_filter + ' ORDER BY next_fire_at,id',
+                                (route, *scope_params)).fetchall()
             for row in rows:
                 used = None
                 if row['max_slots'] is not None:
@@ -296,7 +303,8 @@ class Scheduler:
                 capacity -= keep
             reserved = conn.execute('''SELECT * FROM schedule_firings WHERE outcome='pending'
                 AND execution_route IS ? AND (next_attempt_at IS NULL OR next_attempt_at<=?)
-                ORDER BY COALESCE(last_attempt_at,''),scheduled_at,fire_key LIMIT ?''', (route, now, limit)).fetchall()
+                ''' + firing_filter + " ORDER BY COALESCE(last_attempt_at,''),scheduled_at,fire_key LIMIT ?",
+                                    (route, now, *scope_params, limit)).fetchall()
         result = []
         for firing in reserved:
             try:

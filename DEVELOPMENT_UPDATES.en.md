@@ -103,3 +103,11 @@ The preview adds experimental tools for staging synthetic domains and resuming i
 Development now includes a mixed-mode adapter and recovery-set capture for a fixed Debian layout. Synthetic checks used the same 147 frozen files. Windows passed 51 checks and skipped one Unix ownership check. Debian passed all 52. The tests simulated service control. Live mixed-mode activation and Collector adoption still need validation.
 
 A separate Debian installation rehearsal used a test credential to verify first installation, repeat installation, and credential loading after a service restart. The installation image, machine reboot, and long-running operation still need validation.
+
+## 0.1.1-m0.12 (2026-11-16)
+
+This release adds a one-shot model task example. Use synthetic text to rehearse scheduling, claiming a task, and reading its result and token usage.
+
+- The worker runs against an explicitly approved text reference and hash. Repeated triggers for the same grant and time slot reuse the existing task.
+- The DeepSeek HTTPS client can run in a subprocess with a deadline for the whole call. A simulated timeout leaves the outcome unknown to avoid an automatic resubmission.
+- Scheduling and task claims can filter by schedule or task ID. The public package passed 62 tests on each of Windows and Debian, with zero real model calls. Timer service integration and long-running operation still need validation.

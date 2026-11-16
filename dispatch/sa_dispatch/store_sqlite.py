@@ -265,7 +265,7 @@ class SqliteStore:
 
     device_register = register_device
 
-    def claim(self, device_id, caps=None, *, synthetic_handoff=False, kinds=None):
+    def claim(self, device_id, caps=None, *, synthetic_handoff=False, kinds=None, task_id=None):
         with self._tx(execution=True) as c:
             dev = c.execute('SELECT * FROM devices WHERE device_id=?',(device_id,)).fetchone()
             if not dev: raise DispatchError('device must be registered')
@@ -280,6 +280,9 @@ class SqliteStore:
                 params = (self.route,)
             if synthetic_handoff or self.route == HTTP_ROUTE:
                 sql += " AND access='synthetic' AND EXISTS (SELECT 1 FROM transport_handoffs h WHERE h.task_id=tasks.task_id)"
+            if task_id is not None:
+                sql += ' AND task_id=?'
+                params += (task_id,)
             for row in c.execute(sql + " ORDER BY created_at,task_id", params).fetchall():
                 if kinds is not None and row['kind'] not in kinds: continue
                 if self.route is not None and not self._enabled_kind(row['kind'], row['kind_version']): continue

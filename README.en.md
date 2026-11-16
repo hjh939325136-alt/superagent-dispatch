@@ -60,6 +60,8 @@ Offline checkpoints can now preserve supported ignored late receipts after an ex
 
 This preview also includes an [experimental maintenance toolkit](tools/m0_native_mixed/README.en.md) for staging synthetic research and content directories and rehearsing interrupted mixed-mode activation. Live Collector adoption still needs validation.
 
+The preview includes a [one-shot model task example](tools/m0_agent/README.en.md). Developers can bind approved synthetic text to a time slot, let a local worker claim it, and inspect its result and token usage. A simulated timeout leaves the outcome unknown to prevent automatic resubmission.
+
 ## Current status
 
 The public preview includes local examples and experimental maintenance tools. See [development updates](DEVELOPMENT_UPDATES.en.md) for the latest adapter and installation rehearsal progress.

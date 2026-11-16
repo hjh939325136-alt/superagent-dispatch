@@ -16,4 +16,4 @@ python -X utf8 -B -m unittest tools.m0_native_mixed.test_domains tools.m0_native
 
 Tests use temporary directories, real SQLite/CAS and activation transactions, and synthetic service and recovery adapters. Exceptions simulate interruption at 24 points. Physical power loss still needs testing. Windows skips the Unix ownership case.
 
-A real Debian adapter, a complete recovery set, systemd start guards, and live Collector adoption remain pending. The dedicated sandbox still runs in isolated mode.
+The toolkit is for synthetic rehearsals. See [development updates](../../DEVELOPMENT_UPDATES.en.md) for the adapter status.
