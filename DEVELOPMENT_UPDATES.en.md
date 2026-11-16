@@ -150,3 +150,12 @@ The 0013 shared ledger completed an isolated VM milestone. This documentation up
 - An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.
 - A rehearsal restored the checkpoint to a quarantine directory with execution disabled. Independent-disk disaster recovery and long-running multi-task operation still need validation.
 - The development source depends on a common-install baseline outside the public tree and network settings specific to the test environment. A public deployable package requires separate validation.
+
+## 0.1.1-m0.15 (2026-11-16)
+
+This preview publishes shared ledger 0013, the common install baseline, and timed producer and reviewer source. Each handoff is scoped to one slot in the shared ledger.
+
+- Development acceptance on an isolated Debian VM completed three slots, six live DeepSeek requests using 644 tokens, and three handoffs. Pause and resume and a full reboot preserved prior attempts and budgets.
+- A cold recovery copy was restored to an isolated directory with execution disabled. Explicit Collector adoption replayed 30 events, preserved the original gap record, and left zero lag on three streams.
+- The public source packages built and verified offline. Windows passed 228 tests with two POSIX skips. Debian passed 217 tests. The 13 Git-dependent build tests ran on Windows.
+- The VM observation lasted at least 20 minutes. A 24-hour run, native agent integration, production data migration, and recovery onto independent hardware still need validation.

@@ -1,5 +1,6 @@
 """Opt-in loopback transport; never starts a service on import."""
 from dataclasses import asdict
+from contextlib import closing
 import base64
 import binascii
 import hashlib
@@ -12,6 +13,7 @@ import re
 import threading
 
 from .models import DispatchError, Outcome, TaskSpec, FenceRejected
+from .routing import ledger_mode
 
 class TransportError(Exception):
     def __init__(self, code, status):
@@ -126,12 +128,30 @@ class CoordinatorAPI:
         return {'completed':True}
 
     def _synthetic_scope(self):
-        # Dedicated synthetic ledger only. No real task is eligible for handoff.
-        if any(task.access!='synthetic' for task in self.store.list_tasks()):
-            raise TransportError('E_SCOPE',403)
-        snapshot=self.store.snapshot()
-        if any(ev['access']!='synthetic' for ev in snapshot['evidence']):
-            raise TransportError('E_SCOPE',403)
+        # Shared-ledger metadata does not grant HTTP access to another route.
+        # Isolated transports retain the original whole-ledger restriction.
+        with closing(self.store._connect()) as conn:
+            conn.execute('BEGIN')
+            mode = ledger_mode(conn)
+            if mode == 'mixed':
+                if self.store.route != 'http_synthetic':
+                    raise TransportError('E_SCOPE',403)
+                version = conn.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0]
+                if version == '0013':
+                    from .external_migration import verify_schema
+                    verify_schema(conn)
+                elif version != '0012':
+                    raise TransportError('E_SCOPE',403)
+                where, params = ' WHERE execution_route=?', ('http_synthetic',)
+            else:
+                where, params = '', ()
+            if conn.execute('SELECT 1 FROM tasks' + where +
+                    (' AND ' if where else ' WHERE ') + "access!='synthetic' LIMIT 1", params).fetchone():
+                raise TransportError('E_SCOPE',403)
+            evidence_sql = ("SELECT 1 FROM evidence e JOIN tasks t ON t.task_id=e.task_id WHERE t.execution_route=? AND e.access!='synthetic' LIMIT 1"
+                            if where else "SELECT 1 FROM evidence WHERE access!='synthetic' LIMIT 1")
+            if conn.execute(evidence_sql, params).fetchone():
+                raise TransportError('E_SCOPE',403)
 
     def _decode(self, digest, encoded):
         if not isinstance(digest,str) or not re.fullmatch('sha256:[0-9a-f]{64}',digest):

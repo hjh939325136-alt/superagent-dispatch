@@ -14,6 +14,9 @@ MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
 MAX_OUTPUT_TOKENS = 4096
 SOCKET_TIMEOUT_SECONDS = 30
+THINKING_MODES = ("enabled", "disabled")
+CONNECT_PROXY_HOST = '10.0.2.2'
+CONNECT_PROXY_PORT = 7897
 
 
 class DeepSeekError(Exception):
@@ -50,11 +53,24 @@ class Completion:
         return self.finish_reason == "length"
 
 
-def _direct_https(api_key: str, body: bytes) -> tuple[int, bytes]:
+def allowed_connect_proxy(value):
+    return (isinstance(value, dict) and set(value) == {'host', 'port'}
+            and value['host'] == CONNECT_PROXY_HOST and type(value['port']) is int
+            and value['port'] == CONNECT_PROXY_PORT)
+
+
+def _direct_https(api_key: str, body: bytes, *, https_connect_proxy=None) -> tuple[int, bytes]:
     # Construct the verifying context directly so it does not enable SSLKEYLOGFILE.
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.load_default_certs()
-    connection = HTTPSConnection(HOST, timeout=SOCKET_TIMEOUT_SECONDS, context=context)
+    if https_connect_proxy is None:
+        connection = HTTPSConnection(HOST, timeout=SOCKET_TIMEOUT_SECONDS, context=context)
+    else:
+        if not allowed_connect_proxy(https_connect_proxy):
+            raise DeepSeekError('invalid_request')
+        connection = HTTPSConnection(CONNECT_PROXY_HOST, CONNECT_PROXY_PORT,
+                                     timeout=SOCKET_TIMEOUT_SECONDS, context=context)
+        connection.set_tunnel(HOST, 443)
     try:
         connection.request(
             "POST", PATH, body=body,
@@ -117,7 +133,9 @@ def _parse_completion(payload: bytes) -> Completion:
 
 def complete_text(
     *, model: str, approved_text: str, api_key: str, max_tokens: int,
-    _transport: Callable[[str, bytes], tuple[int, bytes]] = _direct_https,
+    thinking: str | None = None,
+    https_connect_proxy: dict | None = None,
+    _transport: Callable[[str, bytes], tuple[int, bytes]] | None = None,
 ) -> Completion:
     """Submit one approved text request. The private transport seam is for tests."""
     if (
@@ -126,14 +144,16 @@ def complete_text(
         or not approved_text.strip()
         or not isinstance(api_key, str) or not re.fullmatch(r"[A-Za-z0-9._~+/=-]{1,1024}", api_key)
         or type(max_tokens) is not int or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS
+        or (thinking is not None and thinking not in THINKING_MODES)
+        or (https_connect_proxy is not None and not allowed_connect_proxy(https_connect_proxy))
     ):
         raise DeepSeekError("invalid_request")
+    request = {"model": model, "messages": [{"role": "user", "content": approved_text}],
+               "max_tokens": max_tokens, "stream": False}
+    if thinking is not None:
+        request["thinking"] = {"type": thinking}
     try:
-        body = json.dumps(
-            {"model": model, "messages": [{"role": "user", "content": approved_text}],
-             "max_tokens": max_tokens, "stream": False},
-            ensure_ascii=False, separators=(",", ":"),
-        ).encode("utf-8")
+        body = json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     except UnicodeError:
         body = None
     if body is None or len(body) > MAX_REQUEST_BYTES:
@@ -141,7 +161,10 @@ def complete_text(
 
     failure = None
     try:
-        status, payload = _transport(api_key, body)
+        if _transport is not None:
+            status, payload = _transport(api_key, body)
+        else:
+            status, payload = _direct_https(api_key, body, https_connect_proxy=https_connect_proxy)
     except TimeoutError:
         failure = "timeout"
     except (OSError, HTTPException):

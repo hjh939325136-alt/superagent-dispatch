@@ -2,7 +2,7 @@
 import json
 import sqlite3
 import re
-from contextlib import contextmanager, closing
+from contextlib import contextmanager, closing, nullcontext
 from dataclasses import asdict, replace
 from datetime import timedelta
 from pathlib import Path
@@ -24,12 +24,14 @@ def _json(value):
 
 class SqliteStore:
     TABLES = ('tasks', 'leases', 'events', 'evidence', 'late_results', 'devices')
+    _allowed_routes = ROUTES
+    _routed_evidence_access = 'synthetic'
 
     def __init__(self, path, *, clock=None, lease_ttl_seconds, kinds=None, component_config=None, route=None):
         if type(lease_ttl_seconds) is not int or lease_ttl_seconds <= 0:
             raise DispatchError('positive explicit lease TTL required')
         self.path = Path(path)
-        if route is not None and route not in ROUTES:
+        if route is not None and route not in self._allowed_routes:
             raise RouteRejected('invalid execution route')
         self._route = route
         self.clock = clock or Clock()
@@ -146,6 +148,16 @@ class SqliteStore:
         self._event(c, task, task['status'], new, reason, actor)
 
     def submit(self, spec, *, side_effect=None, scope=None, control_rule=None):
+        return self._submit(spec, side_effect=side_effect, scope=scope, control_rule=control_rule)
+
+    def _validate_submission_route(self, spec):
+        if self.route is not None and (spec.access != 'synthetic' or spec.egress != 'none'
+                                      or not self._enabled_kind(spec.kind, spec.kind_version)):
+            raise RouteRejected('execution route requires a registered synthetic kind without egress')
+
+    def _submit(self, spec, *, side_effect=None, scope=None, control_rule=None, conn=None):
+        if conn is not None and not conn.in_transaction:
+            raise DispatchError('submission requires the caller write transaction')
         if isinstance(spec, dict) and 'execution_route' in spec:
             raise RouteRejected('task payload cannot set the execution route')
         if isinstance(spec, dict): spec = TaskSpec.from_dict(spec)
@@ -157,9 +169,7 @@ class SqliteStore:
             raise DispatchError('invalid access/egress')
         if not isinstance(spec.params, dict) or any(not isinstance(v,str) or not v for v in spec.required_caps):
             raise DispatchError('invalid params/capabilities')
-        if self.route is not None and (spec.access != 'synthetic' or spec.egress != 'none'
-                                      or not self._enabled_kind(spec.kind, spec.kind_version)):
-            raise RouteRejected('execution route requires a registered synthetic kind without egress')
+        self._validate_submission_route(spec)
         if self.kinds is not None:
             kind = self.kinds.get(spec.kind)
             if kind is None or kind.version != spec.kind_version:
@@ -183,7 +193,7 @@ class SqliteStore:
             fingerprint = sha256_ref(canonical_json(identity))
         except (TypeError, ValueError) as exc:
             raise DispatchError('unsupported task identity value') from exc
-        with self._tx(execution=True) as c:
+        with (self._tx(execution=True) if conn is None else nullcontext(conn)) as c:
             existing = c.execute('SELECT * FROM tasks WHERE idem_key=?', (spec.idem_key,)).fetchone()
             if existing:
                 if existing['execution_route'] != self.route:
@@ -293,15 +303,18 @@ class SqliteStore:
                         'SELECT 1 FROM control_task_rules WHERE task_id=?', (row['task_id'],)).fetchone():
                     continue
                 if not before_claim(c, row, row['fence']+1, device_id, self._now()): continue
-                lease = Lease('l_'+uuid4().hex,row['task_id'],row['fence']+1,device_id,
-                              timestamp(self.clock.now()+timedelta(seconds=self.lease_ttl_seconds)))
-                c.execute("UPDATE tasks SET fence=fence+1,attempts=attempts+1 WHERE task_id=? AND status='queued'",(row['task_id'],))
-                task = dict(row); task['fence'] = lease.fence
-                self._transition(c,task,'leased','claimed',device_id)
-                c.execute("INSERT INTO leases(lease_id,task_id,fence,device_id,granted_at,expires_at,state) VALUES(?,?,?,?,?,?,'active')",
-                          (lease.lease_id,lease.task_id,lease.fence,device_id,self._now(),lease.expires_at))
-                return lease
+                return self._grant_lease(c, row, device_id)
         return None
+
+    def _grant_lease(self, conn, row, device_id):
+        lease = Lease('l_'+uuid4().hex,row['task_id'],row['fence']+1,device_id,
+                      timestamp(self.clock.now()+timedelta(seconds=self.lease_ttl_seconds)))
+        conn.execute("UPDATE tasks SET fence=fence+1,attempts=attempts+1 WHERE task_id=? AND status='queued'", (row['task_id'],))
+        task = dict(row, fence=lease.fence)
+        self._transition(conn,task,'leased','claimed',device_id)
+        conn.execute("INSERT INTO leases(lease_id,task_id,fence,device_id,granted_at,expires_at,state) VALUES(?,?,?,?,?,?,'active')",
+                     (lease.lease_id,lease.task_id,lease.fence,device_id,self._now(),lease.expires_at))
+        return lease
 
     def _active(self,c,lease_id,fence,device_id):
         lease = c.execute('SELECT * FROM leases WHERE lease_id=?',(lease_id,)).fetchone()
@@ -340,8 +353,8 @@ class SqliteStore:
         self._reject_reserved_evidence(outcome)
         for ev in outcome.evidence:
             if ev.access not in ('synthetic','exportable','local_only'): raise DispatchError('invalid evidence access')
-            if self.route is not None and ev.access != 'synthetic':
-                raise RouteRejected('mixed completion requires synthetic evidence')
+            if self.route is not None and ev.access != self._routed_evidence_access:
+                raise RouteRejected('completion evidence access does not match its execution route')
             c.execute('INSERT OR IGNORE INTO evidence VALUES(?,?,?,?,?,?,?,?,?)',
                       ('e_'+uuid4().hex,task['task_id'],task['fence'],ev.kind,_json(asdict(ev.ref)) if ev.ref else None,
                        ev.content_hash,ev.artifact_hash,ev.access,self._now()))
@@ -450,8 +463,8 @@ class SqliteStore:
         rejected=False
         with self._tx(execution=True) as c:
             lease,task,valid=self._active(c,lease_id,fence,device_id)
-            if self.route is not None and any(item.access != 'synthetic' for item in outcome.evidence):
-                raise RouteRejected('mixed completion requires synthetic evidence')
+            if self.route is not None and any(item.access != self._routed_evidence_access for item in outcome.evidence):
+                raise RouteRejected('completion evidence access does not match its execution route')
             if lease and lease['state']=='completed' and lease['fence']==fence and lease['device_id']==device_id and lease['completion_json']==encoded:
                 return
             if not valid:
@@ -464,11 +477,15 @@ class SqliteStore:
                     kind=self.kinds.get(task['kind']) if self.kinds else None
                     if not getattr(kind,'allow_no_new',False) or not any(e.kind=='request_log' for e in outcome.evidence):
                         raise DispatchError('no_new requires explicit kind support and request evidence')
+                self._before_complete(c, task, outcome, device_id)
                 self._record_evidence(c,task,outcome)
                 self._transition(c,task,outcome.status,'completed',device_id)
                 c.execute('UPDATE tasks SET result_json=? WHERE task_id=?',(_json(outcome.result),task['task_id']))
                 c.execute("UPDATE leases SET state='completed',completion_json=? WHERE lease_id=?",(encoded,lease_id))
         if rejected: raise FenceRejected('completion is late or not owned')
+
+    def _before_complete(self, conn, task, outcome, device_id):
+        """Allow a dedicated store to settle control records in the completion transaction."""
 
     def mark_unknown(self,lease_id,fence,reason,device_id):
         with self._tx(execution=True) as c:

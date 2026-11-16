@@ -1,7 +1,9 @@
 """Simulated DeepSeek tests. All responses and credentials are synthetic."""
 
+from io import BytesIO
 import json
 import os
+import ssl
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -43,6 +45,9 @@ class DeepSeekClientTest(unittest.TestCase):
         transport.assert_called_once()
         key, body = transport.call_args.args
         self.assertTrue(key == SIMULATED_KEY)
+        self.assertEqual(body, ('{"model":"simulated-requested-model",'
+                                '"messages":[{"role":"user","content":"批准的示例"}],'
+                                '"max_tokens":50,"stream":false}').encode())
         self.assertEqual(json.loads(body), {
             "model": "simulated-requested-model",
             "messages": [{"role": "user", "content": "批准的示例"}],
@@ -55,6 +60,13 @@ class DeepSeekClientTest(unittest.TestCase):
         self.assertFalse(result.truncated)
         self.assertEqual(result.usage, client.TokenUsage(12, 5, 17, 0, 12))
         self.assertNotIn(result.text, repr(result))
+
+    def test_explicit_thinking_modes_serialize_as_objects(self):
+        transport = Mock(return_value=(200, json.dumps(simulated_completion()).encode()))
+        for mode in ('enabled', 'disabled'):
+            with self.subTest(mode=mode):
+                self.complete(transport, thinking=mode)
+                self.assertEqual(json.loads(transport.call_args.args[1])['thinking'], {'type': mode})
 
     def test_direct_transport_only_uses_fixed_host_and_does_not_follow_redirect(self):
         connection = MagicMock()
@@ -80,12 +92,44 @@ class DeepSeekClientTest(unittest.TestCase):
         response.getheader.assert_not_called()
         connection.close.assert_called_once()
 
+    def test_connect_proxy_keeps_provider_sni_and_bearer_inside_tls(self):
+        plain, tls = MagicMock(), MagicMock()
+        plain.makefile.return_value = BytesIO(b'HTTP/1.1 200 Connection established\r\n\r\n')
+        tls.makefile.return_value = BytesIO(b'HTTP/1.1 307 Temporary Redirect\r\nContent-Length: 0\r\n\r\n')
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        verified_context = Mock(wraps=context)
+        verified_context.wrap_socket.return_value = tls
+        proxy = {'host': '10.0.2.2', 'port': 7897}
+        with (patch('http.client.socket.create_connection', return_value=plain) as connect,
+              patch.object(client.ssl, 'SSLContext', return_value=verified_context),
+              patch.dict(os.environ, {'HTTPS_PROXY': 'http://ignored.example/'})):
+            error = self.assert_failure('redirect_rejected', True, None, https_connect_proxy=proxy)
+        self.assertEqual(error.status, 307)
+        connect.assert_called_once()
+        self.assertEqual(connect.call_args.args[0], ('10.0.2.2', 7897))
+        verified_context.wrap_socket.assert_called_once_with(plain, server_hostname='api.deepseek.com')
+        self.assertTrue(context.check_hostname)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertIsNone(context.keylog_filename)
+        connect_bytes = b''.join(call.args[0] for call in plain.sendall.call_args_list)
+        https_bytes = b''.join(call.args[0] for call in tls.sendall.call_args_list)
+        self.assertTrue(connect_bytes.startswith(b'CONNECT api.deepseek.com:443 HTTP/'))
+        self.assertNotIn(b'Authorization', connect_bytes)
+        self.assertNotIn(SIMULATED_KEY.encode(), connect_bytes)
+        self.assertTrue(https_bytes.startswith(b'POST /chat/completions HTTP/'))
+        self.assertIn(b'Authorization: Bearer ' + SIMULATED_KEY.encode(), https_bytes)
+        self.assertIn(b'Host: api.deepseek.com', https_bytes)
+
     def test_definite_invalid_input_never_calls_transport(self):
         transport = Mock()
         for overrides in ({"model": ""}, {"api_key": "simulated-key\r\nX: y"},
                           {"approved_text": "你" * client.MAX_REQUEST_BYTES},
                           {"approved_text": "\ud800"}, {"max_tokens": True},
-                          {"max_tokens": client.MAX_OUTPUT_TOKENS + 1}):
+                          {"max_tokens": client.MAX_OUTPUT_TOKENS + 1}, {"thinking": "auto"},
+                          {"thinking": {"type": "disabled"}},
+                          {'https_connect_proxy': {'host': 'wrong.example', 'port': 7897}},
+                          {'https_connect_proxy': {'host': '10.0.2.2', 'port': 7898}},
+                          {'https_connect_proxy': {'host': '10.0.2.2', 'port': 7897, 'authorization': 'x'}}):
             with self.subTest(field=next(iter(overrides))):
                 self.assert_failure("invalid_request", False, transport, **overrides)
         transport.assert_not_called()

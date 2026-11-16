@@ -33,7 +33,7 @@ _KINDS = frozenset(('task.submitted task.leased task.running task.succeeded task
     'budget.exceeded budget.reserved budget.settled budget.uncertain worker.registered worker.revoked worker.heartbeat_missed '
     'backup.completed restore.verified permission_conflict revocation.propagated '
     'adapter.parse_error hook.observed handoff.offered handoff.accepted '
-    'handoff.completed handoff.rejected handoff.expired handoff.observed '
+    'handoff.completed handoff.rejected handoff.expired handoff.observed campaign.context_read campaign.paused '
     'host.observed host.unknown reconciliation.observed knowledge.changed '
     'schedule.backlog_exceeded schedule.bound_removed schedule.clock_skew '
     'schedule.exhausted schedule.rejected schedule.retry_scheduled schedule.template_error').split())

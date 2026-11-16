@@ -13,7 +13,9 @@ from .states import TERMINAL
 
 HTTP_ROUTE = 'http_synthetic'
 LOCAL_ROUTE = 'local_synthetic'
+EXTERNAL_ROUTE = 'agent_external'
 ROUTES = (HTTP_ROUTE, LOCAL_ROUTE)
+ALL_ROUTES = (*ROUTES, EXTERNAL_ROUTE)
 ROUTED_TABLES = {'tasks': 'task_id', 'devices': 'device_id', 'schedules': 'id',
                  'schedule_firings': 'fire_key'}
 
@@ -142,15 +144,110 @@ def activate_mixed(path, *, actor, evidence_ref, bindings, artifacts, clock=None
         conn.execute("UPDATE ledger_mode SET mode='mixed' WHERE id=1")
 
 
-def validate_mixed_records(records):
-    """Apply the same route checks to a ledger snapshot and a portable layout."""
+def _external_task_params(row):
+    try:
+        params = json.loads(row['params_json'])
+        source = params['prompt_ref']
+        scheduled_at = params['scheduled_at']
+        grant_id, version = params['grant_id'], params['version']
+        if (set(params) != {'grant_id', 'version', 'prompt_ref', 'source', 'provider', 'model',
+                            'max_tokens', 'scheduled_at', 'egress', 'execution_mode'}
+                or (params['provider'], params['execution_mode'], params['egress']) != ('deepseek', 'live', 'derived')
+                or params['source'] not in ('public', 'synthetic')
+                or not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}', grant_id)
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', params['model'])
+                or type(version) is not int or not 1 <= version < 2**63
+                or type(params['max_tokens']) is not int or not 1 <= params['max_tokens'] <= 4096
+                or set(source) != {'owner', 'kind', 'id', 'version', 'hash'}
+                or any(not isinstance(value, str) or not value for value in source.values())
+                or source['kind'] != 'agent_prompt' or source['version'] == 'latest' or not _digest(source['hash'])
+                or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+00:00', scheduled_at)
+                or row['idem_key'] != f'sched:{grant_id}:v{version}:{scheduled_at}'
+                or json.loads(row['scope_json']) != {'grant_id': grant_id, 'grant_version': version}
+                or json.loads(row['input_refs_json']) != [source]
+                or json.loads(row['required_caps_json']) != ['agent.deepseek']):
+            raise ValueError('unexpected agent task fields')
+    except (KeyError, TypeError, ValueError):
+        raise RouteRejected('external task has an invalid fixed grant profile') from None
+    return params
+
+
+def _validate_external_records(records):
+    from .campaign_validation import validate_campaign_records
+
+    try:
+        campaign_owned = validate_campaign_records(records)
+    except DispatchError as error:
+        raise RouteRejected('external campaign ownership or control records are invalid') from error
+    owned = {table: [row for row in records.get(table, []) if row['execution_route'] == EXTERNAL_ROUTE
+                     and row[ROUTED_TABLES[table]] not in campaign_owned[table]]
+             for table in ROUTED_TABLES}
+    if any(len(rows) > 1 for rows in owned.values()):
+        raise RouteRejected('external route supports one fixed grant and one slot')
+    if not any(owned.values()):
+        return
+    try:
+        (device,), (schedule,) = owned['devices'], owned['schedules']
+        if json.loads(device['caps_json']) != ['agent.deepseek']:
+            raise ValueError('unexpected external capability')
+        if not owned['tasks']:
+            if owned['schedule_firings']:
+                raise ValueError('external firing has no task')
+            return
+        (task,), (firing,) = owned['tasks'], owned['schedule_firings']
+        params = _external_task_params(task)
+        if ((task['kind'], task['kind_version'], task['side_effect'], task['access'], task['egress'],
+             task['max_attempts'], task['parent_task_id']) != ('agent.run', 1, 'external', 'exportable', 'derived', 1, None)
+                or task['attempts'] not in (0, 1) or task['fence'] not in (0, 1)
+                or schedule['id'] != params['grant_id'] or schedule['enabled']
+                or (firing['task_id'], firing['schedule_id'], firing['fire_key'], firing['scheduled_at'],
+                    firing['outcome'], firing['task_template']) != (task['task_id'], schedule['id'], task['idem_key'],
+                    params['scheduled_at'], 'created', schedule['task_template'])):
+            raise ValueError('unexpected external task or slot')
+        rules = [row for row in records['control_task_rules'] if row['task_id'] == task['task_id']]
+        approvals = {row['approval_id']: row for row in records['control_approvals']}
+        rule, = rules
+        approval = approvals[rule['approval_id']]
+        if (rule['fingerprint'] != task['fingerprint'] or not rule['budget_id'] or not rule['approval_scope']
+                or rule['reserve_units'] != 1 or approval['task_id'] != task['task_id']
+                or approval['fingerprint'] != task['fingerprint'] or approval['scope'] != rule['approval_scope']
+                or approval['decision'] != 'approved' or not _digest(approval['evidence_ref'])):
+            raise ValueError('unexpected external control records')
+        for lease in records['leases']:
+            if lease['task_id'] == task['task_id'] and (lease['device_id'], lease['fence']) != (device['device_id'], 1):
+                raise ValueError('unexpected external lease')
+        for reservation in records['control_reservations']:
+            if reservation['task_id'] == task['task_id'] and (
+                    reservation['budget_id'], reservation['fence'], reservation['fingerprint'],
+                    reservation['reserved_units']) != (rule['budget_id'], 1, task['fingerprint'], 1):
+                raise ValueError('unexpected external reservation')
+    except (KeyError, TypeError, ValueError):
+        raise RouteRejected('external route has inconsistent device, slot, or control records') from None
+
+
+def validate_mixed_records(records, *, allow_external=False):
+    """Apply route checks to a ledger snapshot or portable layout.
+
+    Only callers using an explicit external profile may validate external rows.
+    This validates stored structure. The live runner verifies approval artifacts
+    and the active grant before authorizing a provider request.
+    """
+    allowed = ALL_ROUTES if allow_external else ROUTES
+    if any(row['execution_route'] not in (None, *allowed)
+           for table in (*ROUTED_TABLES, 'route_audit') for row in records.get(table, [])):
+        raise RouteRejected('snapshot contains a route outside its execution profile')
     tasks = {row['task_id']: row['execution_route'] for row in records['tasks']}
-    if any(row['access'] != 'synthetic' or row['egress'] != 'none'
-           or (row['execution_route'] is None and row['status'] not in TERMINAL)
-           for row in records['tasks']):
+    if any((row['access'] != 'synthetic' or row['egress'] != 'none'
+            or (row['execution_route'] is None and row['status'] not in TERMINAL))
+           for row in records['tasks'] if row['execution_route'] != EXTERNAL_ROUTE):
         raise RouteRejected('mixed ledger has non-synthetic or unbound live tasks')
-    if any(row['access'] != 'synthetic' for row in records['evidence']):
-        raise RouteRejected('mixed ledger has non-synthetic evidence')
+    for row in records['evidence']:
+        if tasks.get(row['task_id']) == EXTERNAL_ROUTE:
+            if (row['access'] != 'local_only' or row['kind'] != 'agent_result'
+                    or not _digest(row['artifact_hash']) or row['artifact_hash'] != row['content_hash']):
+                raise RouteRejected('external task has invalid result evidence')
+        elif row['access'] != 'synthetic':
+            raise RouteRejected('mixed ledger has non-synthetic evidence')
 
     schedules = {row['id']: row['execution_route'] for row in records['schedules']}
     if any(row['enabled'] and row['execution_route'] is None for row in records['schedules']):
@@ -167,8 +264,11 @@ def validate_mixed_records(records):
         for row in records[table]:
             if row['task_id'] not in tasks:
                 raise RouteRejected('mixed ledger has orphan HTTP authority')
-            if tasks[row['task_id']] == LOCAL_ROUTE:
+            route = tasks[row['task_id']]
+            if route == LOCAL_ROUTE:
                 raise RouteRejected('local task has HTTP ' + authority + ' authority')
+            if allow_external and route != HTTP_ROUTE:
+                raise RouteRejected('HTTP ' + authority + ' authority requires a task on the HTTP route')
 
     lease_tasks = {row['lease_id']: row['task_id'] for row in records['leases']}
     if any(row['lease_id'] is not None and lease_tasks.get(row['lease_id']) != row['task_id']
@@ -193,3 +293,5 @@ def validate_mixed_records(records):
             raise RouteRejected('device ownership conflicts with routed lease history')
         if audited_devices.get(device) not in (None, route):
             raise RouteRejected('device audit disagrees with routed lease history')
+    if allow_external:
+        _validate_external_records(records)

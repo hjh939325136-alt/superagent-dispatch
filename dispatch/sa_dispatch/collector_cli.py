@@ -20,12 +20,13 @@ def load_binding(path):
     path=plain(path)
     if path.stat().st_size>65536:raise ValueError('binding too large')
     value=json.loads(path.read_bytes(),object_pairs_hook=unique)
-    if set(value)!={'schema','target','sources'} or value['schema']!='sa_dispatch.collector_binding.v1':raise ValueError('invalid trusted binding')
+    if set(value)!={'schema','target','sources'} or value['schema'] not in ('sa_dispatch.collector_binding.v1','sa_dispatch.collector_binding.v2'):raise ValueError('invalid trusted binding')
     target=plain(value['target'])
     if not isinstance(value['sources'],list) or len(value['sources'])>100:raise ValueError('invalid source list')
     sources={};allowed={f.name for f in fields(SourceBinding)}
     for row in value['sources']:
-        if set(row) not in (allowed,allowed-{'collection_mode'}):raise ValueError('unexpected binding source field')
+        if set(row) not in (allowed,allowed-{'profile'},allowed-{'collection_mode'},allowed-{'collection_mode','profile'}):raise ValueError('unexpected binding source field')
+        if row.get('profile') is not None and value['schema']!='sa_dispatch.collector_binding.v2':raise ValueError('metadata profile requires binding v2')
         source=SourceBinding(**row)
         if source.source_id in sources:raise ValueError('duplicate source id')
         sources[source.source_id]=source

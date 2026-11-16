@@ -35,7 +35,7 @@ def authorize_read(action, arg1, arg2, database, trigger):
         'count', 'max', 'min', 'sum', 'coalesce', 'json_extract', 'json_valid', 'json_type',
         'length', 'lower', 'upper', 'abs'}:
         return sqlite3.SQLITE_OK
-    if action == sqlite3.SQLITE_PRAGMA and arg1 in {'table_info', 'index_list', 'index_info'}:
+    if action == sqlite3.SQLITE_PRAGMA and (arg1 in {'table_info', 'index_list', 'index_info'} or (arg1 == 'user_version' and arg2 is None)):
         return sqlite3.SQLITE_OK
     return sqlite3.SQLITE_DENY
 

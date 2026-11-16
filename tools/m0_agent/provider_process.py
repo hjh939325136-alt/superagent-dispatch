@@ -9,10 +9,13 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from tools.m0_agent.deepseek_client import Completion, DeepSeekError, TokenUsage, complete_text
+from tools.m0_agent.deepseek_client import (THINKING_MODES, Completion, DeepSeekError, TokenUsage,
+                                            allowed_connect_proxy, complete_text)
 
 INPUT_LIMIT = 72 * 1024
 OUTPUT_LIMIT = 320 * 1024
+REQUEST_FIELDS = {'model', 'approved_text', 'api_key', 'max_tokens'}
+OPTIONAL_FIELDS = {'thinking', 'https_connect_proxy'}
 ERROR_KINDS = frozenset(('invalid_request', 'response_too_large', 'incomplete_response',
     'timeout', 'connection_error', 'auth_rejected', 'rate_limited', 'redirect_rejected',
     'provider_error', 'invalid_response'))
@@ -28,7 +31,10 @@ def _child():
         if len(raw) > INPUT_LIMIT:
             raise DeepSeekError('invalid_request')
         request = json.loads(raw)
-        if not isinstance(request, dict) or set(request) != {'model', 'approved_text', 'api_key', 'max_tokens'}:
+        if (not isinstance(request, dict)
+                or not REQUEST_FIELDS <= set(request) <= REQUEST_FIELDS | OPTIONAL_FIELDS
+                or ('thinking' in request and request['thinking'] not in THINKING_MODES)
+                or ('https_connect_proxy' in request and not allowed_connect_proxy(request['https_connect_proxy']))):
             raise DeepSeekError('invalid_request')
         result = complete_text(**request)
         response = {'ok': True, 'completion': asdict(result)}
@@ -45,13 +51,20 @@ def _child():
     sys.stdout.buffer.flush()
 
 
-def complete_bounded(*, model, approved_text, api_key, max_tokens, deadline_seconds=45):
+def complete_bounded(*, model, approved_text, api_key, max_tokens, deadline_seconds=45,
+                     thinking=None, https_connect_proxy=None):
     """One child, one request. Timeout is ambiguous and never automatically retried."""
-    if type(deadline_seconds) not in (int, float) or not 0 < deadline_seconds <= 120:
+    if (type(deadline_seconds) not in (int, float) or not 0 < deadline_seconds <= 120
+            or (thinking is not None and thinking not in THINKING_MODES)
+            or (https_connect_proxy is not None and not allowed_connect_proxy(https_connect_proxy))):
         raise DeepSeekError('invalid_request')
+    request = dict(model=model, approved_text=approved_text, api_key=api_key, max_tokens=max_tokens)
+    if thinking is not None:
+        request['thinking'] = thinking
+    if https_connect_proxy is not None:
+        request['https_connect_proxy'] = https_connect_proxy
     try:
-        raw = json.dumps(dict(model=model, approved_text=approved_text, api_key=api_key,
-                              max_tokens=max_tokens), ensure_ascii=False, allow_nan=False).encode('utf-8')
+        raw = json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8')
     except (TypeError, ValueError, UnicodeError):
         raw = None
     if raw is None or len(raw) > INPUT_LIMIT:

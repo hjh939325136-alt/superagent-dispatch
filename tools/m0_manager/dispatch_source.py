@@ -1,11 +1,12 @@
 """Read the current task/control ledger without initializing or projecting it."""
 import json
 import re
+import sqlite3
 from datetime import timedelta
 from .binding import now, instant, token, fixed_ref
 from .readonly import readonly_db, SourceError
 
-SUPPORTED = {'0010', '0011', '0012'}
+SUPPORTED = {'0010', '0011', '0012', '0013'}
 TASK_FIELDS = 'task_id,kind,kind_version,track,status,fence,attempts,side_effect,access,created_at,updated_at,fingerprint'
 
 
@@ -24,7 +25,20 @@ def schema(db, source):
     version = db.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0]
     if version not in SUPPORTED or version not in source['accepted_schema_versions']:
         raise SourceError('source_schema_unsupported')
-    if version == '0012':
+    if version == '0013':
+        if source.get('class') != 'local_only' or source.get('options', {}).get('profile') != 'common_metadata_0013':
+            raise SourceError('source_scope_not_synthetic')
+        from dispatch.sa_dispatch.external_migration import verify_schema
+        from dispatch.sa_dispatch.models import DispatchError
+        try:
+            if verify_schema(db) != '0013': raise ValueError('0013 required')
+        except (ValueError, sqlite3.DatabaseError, DispatchError) as error:
+            raise SourceError('source_schema_unsupported') from error
+        if db.execute("SELECT 1 FROM tasks WHERE execution_route='agent_external' AND (kind!='agent.run' OR kind_version!=1 OR side_effect!='external' OR access!='exportable' OR egress!='derived' OR max_attempts!=1) LIMIT 1").fetchone():
+            raise SourceError('source_scope_not_synthetic')
+        if db.execute("SELECT 1 FROM tasks WHERE (execution_route IS NULL OR execution_route!='agent_external') AND (access!='synthetic' OR egress!='none') LIMIT 1").fetchone():
+            raise SourceError('source_scope_not_synthetic')
+    if version in ('0012', '0013'):
         if not {'ledger_mode', 'route_audit'} <= available:
             raise SourceError('source_schema_unsupported')
         modes = db.execute('SELECT id,mode FROM ledger_mode').fetchall()
@@ -33,7 +47,7 @@ def schema(db, source):
         for table in ('tasks', 'devices', 'schedules', 'schedule_firings'):
             if 'execution_route' not in {row[1] for row in db.execute(f'PRAGMA table_info({table})')}:
                 raise SourceError('source_schema_unsupported')
-    if db.execute("SELECT 1 FROM tasks WHERE access IS NOT 'synthetic' LIMIT 1").fetchone():
+    if version != '0013' and db.execute("SELECT 1 FROM tasks WHERE access IS NOT 'synthetic' LIMIT 1").fetchone():
         raise SourceError('source_scope_not_synthetic')
     return version, available
 

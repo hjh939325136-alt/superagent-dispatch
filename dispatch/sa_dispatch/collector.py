@@ -16,6 +16,7 @@ import stat
 import sys
 
 from .clock import Clock, timestamp
+from .campaign_validation import DEVICES, PREFIX
 from .unified_events import _token, _at, _ulid, _REF, _KINDS, _META_VALUES, _STATUSES
 
 SCHEMA='''
@@ -172,6 +173,7 @@ class SourceBinding:
     data_class: str='internal'
     synthetic_only: bool=True
     collection_mode: str='incremental'
+    profile: str | None=None
 
     @classmethod
     def enroll(cls,source_id,kind,locator,source_instance,accepted_schema_versions,*,data_class='internal',collection_mode='incremental'):
@@ -182,13 +184,20 @@ class SourceBinding:
         for value in (self.source_id,self.source_instance,stream):_token(value)
         if len(self.source_id)>60 or len(self.source_instance)>80:raise ValueError('source namespace too long')
         if self.kind not in STREAMS or stream not in STREAMS[self.kind]:raise ValueError('unsupported source stream')
-        if self.synthetic_only is not True or self.data_class not in ('public','internal','local_only'):raise ValueError('synthetic source required')
+        if self.profile is None:
+            if self.synthetic_only is not True or self.data_class not in ('public','internal','local_only'):raise ValueError('synthetic source required')
+        elif (self.profile!='common_metadata_0013' or self.kind!='dispatch' or self.synthetic_only is not False
+              or self.data_class!='local_only' or tuple(self.accepted_schema_versions)!=('0013',)
+              or self.collection_mode!='incremental' or stream not in ('events','control_events','schedule_events')):
+            raise ValueError('invalid common metadata profile')
         if not self.file_identity or not self.accepted_schema_versions:raise ValueError('pinned identity/schema required')
         if self.collection_mode not in ('incremental','snapshot_only'):raise ValueError('invalid collection mode')
 
     def fingerprint(self):
-        return digest({'kind':self.kind,'file_identity':self.file_identity,'instance':self.source_instance,
-                       'class':self.data_class,'synthetic_only':self.synthetic_only,'collection_mode':self.collection_mode})
+        value={'kind':self.kind,'file_identity':self.file_identity,'instance':self.source_instance,
+               'class':self.data_class,'synthetic_only':self.synthetic_only,'collection_mode':self.collection_mode}
+        if self.profile is not None:value['profile']=self.profile
+        return digest(value)
 
 
 def readonly(path):
@@ -199,7 +208,7 @@ def readonly(path):
         allowed=action in (sqlite3.SQLITE_SELECT,sqlite3.SQLITE_READ)
         allowed |= action==sqlite3.SQLITE_FUNCTION and (arg2 or '').lower() in ('count','max','min','coalesce')
         allowed |= action==sqlite3.SQLITE_TRANSACTION and arg1 in ('BEGIN','ROLLBACK')
-        allowed |= action==sqlite3.SQLITE_PRAGMA and arg1=='table_info' and arg2 is not None
+        allowed |= action==sqlite3.SQLITE_PRAGMA and ((arg1=='table_info' and arg2 is not None) or (arg1=='user_version' and arg2 is None))
         return sqlite3.SQLITE_OK if allowed else sqlite3.SQLITE_DENY
     conn.set_authorizer(authorize)
     conn.execute('BEGIN')
@@ -231,7 +240,14 @@ def source_info(conn,binding,stream,*,require_stream=True):
                   'reconciliations':'id task_id epoch method result evidence_ref decided_by at',
                   'host_events':'task_id fence seq event_ref'}
         if [row[1] for row in columns]!=expected[stream].split():raise ValueError('unsupported dispatch stream schema')
-        if conn.execute("SELECT 1 FROM tasks WHERE access IS NOT 'synthetic' LIMIT 1").fetchone():raise ValueError('non-synthetic task')
+        if binding.profile=='common_metadata_0013':
+            from .external_migration import verify_schema
+            if verify_schema(conn)!='0013':raise ValueError('common metadata requires verified 0013')
+            if conn.execute("SELECT 1 FROM tasks WHERE (execution_route IS NULL OR execution_route IN ('http_synthetic','local_synthetic')) AND (access!='synthetic' OR egress!='none') LIMIT 1").fetchone():
+                raise ValueError('synthetic route changed')
+            if conn.execute("SELECT 1 FROM tasks WHERE execution_route='agent_external' AND (kind!='agent.run' OR kind_version!=1 OR side_effect!='external' OR access!='exportable' OR egress!='derived' OR max_attempts!=1) LIMIT 1").fetchone():
+                raise ValueError('invalid external metadata source')
+        elif conn.execute("SELECT 1 FROM tasks WHERE access IS NOT 'synthetic' LIMIT 1").fetchone():raise ValueError('non-synthetic task')
     else:
         table='source_meta' if binding.kind=='catalog' else 'collector_fixture_meta'
         meta=dict(conn.execute('SELECT key,value FROM '+table))
@@ -300,6 +316,28 @@ def enrich(source,binding,stream,row):
     return row
 
 
+def _validate_campaign_event(binding, stream, row):
+    """Recognize only the metadata shapes produced by a common campaign."""
+    if binding.profile != 'common_metadata_0013':
+        raise ValueError('campaign event requires the common metadata profile')
+    campaign_id = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,47}'
+    prefix = re.escape(PREFIX) + campaign_id
+    if row['kind'] == 'campaign.context_read':
+        refs = json.loads(row['refs_json']) if stream == 'control_events' else None
+        if (stream != 'control_events' or row['actor'] != DEVICES['reviewer'] or row['fence'] != 1
+                or row['detail_code'] != 'observed'
+                or not re.fullmatch(r't_[0-9a-f]{32}', row['task_id'] or '')
+                or not re.fullmatch(r'[0-7][0-9A-HJKMNP-TV-Z]{25}', row['event_id'])
+                or not re.fullmatch('campaign-context:' + prefix + r':slot:(?:[1-9]|[1-3][0-9]|4[0-8])',
+                                    row['event_key'])
+                or not isinstance(refs, list) or len(refs) != 3
+                or any(not isinstance(ref, str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', ref) for ref in refs)):
+            raise ValueError('invalid campaign context event')
+    elif (stream != 'schedule_events' or row['version'] != 1 or row['detail_code'] != 'operator_stop'
+          or not re.fullmatch(prefix + r':(?:producer|reviewer)', row['schedule_id'])):
+        raise ValueError('invalid campaign pause event')
+
+
 def project(binding,stream,row,at):
     """Whitelist projection. Raw body/argv/path/reason never persists."""
     seq=row['_collector_seq']; task=row.get('task_id'); fence=row.get('fence',row.get('epoch'))
@@ -313,6 +351,8 @@ def project(binding,stream,row,at):
         event.update(kind=kind,actor=row['actor'],metadata={'to_status':new,**({'from_status':old} if old else {})})
     elif stream in ('control_events','schedule_events'):
         event['kind']=row['kind']
+        if row['kind'] in ('campaign.context_read', 'campaign.paused'):
+            _validate_campaign_event(binding, stream, row)
         if stream=='control_events':
             event['actor']=row['actor'];event['refs']=[raw_ref(ref,'dispatch',row['event_id']) for ref in json.loads(row['refs_json'])]
     elif stream=='reconciliations':

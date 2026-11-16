@@ -8,10 +8,26 @@ import zipfile
 
 def build(root, destination):
     files = {}
-    for folder in ('dispatch/sa_dispatch', 'dispatch/sa_dispatch_hotspot', 'tools/m0_agent'):
+    for folder in ('dispatch/sa_dispatch', 'dispatch/sa_dispatch_hotspot'):
         for path in sorted((root / folder).rglob('*')):
             if path.is_file() and path.suffix in ('.py', '.sql') and '__pycache__' not in path.parts:
                 files['payload/' + path.relative_to(root).as_posix()] = path.read_bytes()
+    agent_modules = (
+        '__init__.py',
+        'deepseek_client.py',
+        'provider_process.py',
+        'readonly_status.py',
+        'runtime.py',
+        'test_deepseek_client.py',
+        'test_provider_process.py',
+        'test_readonly_status.py',
+        'test_runtime.py',
+        'test_worker.py',
+        'worker.py',
+    )
+    for name in agent_modules:
+        source = root / 'tools/m0_agent' / name
+        files['payload/tools/m0_agent/' + name] = source.read_bytes()
     for name in ('__init__.py', 'credentials.py', 'trial.py', 'r1.py', 'test_r1.py'):
         raw = (root / 'tools/m0_installer' / name).read_bytes()
         files['payload/tools/m0_installer/' + name] = raw

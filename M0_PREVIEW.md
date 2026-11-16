@@ -86,6 +86,8 @@ python -B -m sa_dispatch selftest
 
 新增 [R1 安装演练源码](tools/m0_installer/README.md) 和[本机只读状态查询](tools/m0_agent/READONLY_STATUS.md)。可准备一份纯源码演练包，在独立 Debian 环境模拟执行一个预先授权的时间槽，并读取任务状态、用量和结果引用。
 
+共同账本 0013 预览加入[限时双角色任务](tools/m0_agent/CAMPAIGN.md)源码。生产者和审阅者在各自的时间槽内交接，任务、预算和结果引用都可从同一本账回查。
+
 ## 沙盒与交付进度
 
 在一台隔离 Debian 虚拟机上，共同账本已从 0012 升级到 0013。同一本账记录了 HTTP 合成任务、本机合成任务和一个获准的真实 DeepSeek 任务。虚拟机重启和重复安装后，该模型任务仍只有一次尝试，已用额度未重置。
