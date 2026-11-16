@@ -203,3 +203,12 @@ The preview adds a 24-hour observation entry point for the shared coordinator an
 - The isolated VM recorded two good natural samples, and repeated enable kept the original start and deadline. The window was still running when checked. The 24-hour result is pending.
 - Observation covers the shared coordinator and Collector. Model timers stayed disabled, prior tasks, attempts, and handoffs were preserved, and no new model calls occurred.
 - Windows passed 39 tests with one Linux-only lock test skipped. Debian passed 40. Simulated clock and pause-race tests verified decision logic and lock ordering.
+
+## 0.1.1-m0.21 (2026-11-16)
+
+This preview adds unified offline installation of the shared stack on a fresh Debian system. The model execution gate stays closed while the 0013 ledger and services are installed.
+
+- The installer prepares the common baseline, loopback HTTP coordinator, and local execution path. The Collector is enabled, the observer starts paused, and model grants, credentials, jobs, and budgets remain unconfigured.
+- A Debian VM without a virtual NIC resumed from the same package after process termination at seven component receipt boundaries and during offline sealing. It completed one synthetic HTTP task and one local research task and collected eight events. Service restart, reboot, and repeat installation preserved the tasks.
+- Model execution entry points refuse to start in offline mode. Additional model calls: zero. The public source packages built and verified offline. Windows passed 44 focused tests and Debian passed 40.
+- Validation covers fresh offline installation and same-package resume. OS installation, general in-place upgrade, arbitrary migration interruption, conversion to a paid grant, and 24-hour steady operation require separate acceptance.

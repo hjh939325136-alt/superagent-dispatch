@@ -28,6 +28,12 @@ class CommonPackageTests(unittest.TestCase):
     def git(self, *args):
         subprocess.run(['git', '-C', str(self.source), *args], check=True, capture_output=True, timeout=10)
 
+    def test_composed_archive_requires_observer_dependencies(self):
+        for name in package.COMPOSED_DEPENDENCIES:
+            with self.subTest(name=name), self.assertRaisesRegex(package.PackageError, 'complete runtime addons'):
+                package._name_set(package.REQUIRED - {name})
+        package._name_set(package.LEGACY_REQUIRED)
+
     def test_deterministic_scoped_archive_and_installed_source_verification(self):
         again = package.build(self.source, self.root / 'again.zip')
         self.assertEqual(self.archive.read_bytes(), Path(again['path']).read_bytes())

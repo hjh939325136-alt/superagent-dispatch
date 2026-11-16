@@ -32,6 +32,7 @@ LOCAL = 'sa-dispatch-local.service'
 COLLECTOR_SERVICE = 'sa-dispatch-collector.service'
 COLLECTOR_TIMER = 'sa-dispatch-collector.timer'
 CAMPAIGN_TIMERS = ('sa-agent-producer.timer', 'sa-agent-reviewer.timer')
+CAMPAIGN_UNITS = frozenset((*CAMPAIGN_TIMERS, 'sa-agent-producer.service', 'sa-agent-reviewer.service'))
 UNITS = (COORDINATOR, LOCAL, COLLECTOR_SERVICE, COLLECTOR_TIMER,
          'sa-agent-producer.service', *CAMPAIGN_TIMERS, 'sa-agent-reviewer.service')
 SYSTEMCTL = '/usr/bin/systemctl'
@@ -131,7 +132,25 @@ def _boot():
     return {'state': 'observed', 'boot_id': value}
 
 
-def _systemd():
+def _offline_mode(machine, ledger_identity):
+    """Missing roles are expected only with a verified no-grant installation."""
+    record = _receipt(COMMON_STATE, 'superagent.common.external.install.v1', machine)
+    if record.get('execution_mode') != 'offline':
+        return False
+    from tools.m0_agent import common_install
+
+    manifest = record['manifest_sha256']
+    _check(isinstance(manifest, str) and HEX.fullmatch(manifest)
+           and not os.path.lexists(CAMPAIGN_STATE.parent)
+           and not os.path.lexists(CAMPAIGN_CONFIG.parent))
+    release = common_install.RELEASES / manifest
+    common_install._source_files(release, manifest)
+    checked = common_install._Installer(release, machine, manifest).guard()
+    _check(checked['execution_mode'] == 'offline' and checked['ledger_identity'] == ledger_identity)
+    return True
+
+
+def _systemd(*, offline=False):
     argv = [SYSTEMCTL, 'show', '--no-pager', '--property=' + ','.join(('Id', *PROPERTIES)), '--', *UNITS]
     call = subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                           env={'PATH': '/usr/bin:/bin', 'LANG': 'C', 'SYSTEMD_COLORS': '0'},
@@ -150,13 +169,18 @@ def _systemd():
             invalid.add(unit)
             continue
         local_absent = unit == LOCAL and value == LOCAL_ABSENT
-        if not local_absent and value['LoadState'] != 'loaded':
+        role_absent = offline and unit in CAMPAIGN_UNITS and value == LOCAL_ABSENT
+        if not (local_absent or role_absent) and value['LoadState'] != 'loaded':
             invalid.add(unit)
             continue
         candidates[unit] = dict(state='observed', load_state=value['LoadState'], active_state=value['ActiveState'],
                                 sub_state=value['SubState'], unit_file_state=value['UnitFileState'])
         if local_absent:
             candidates[unit]['availability'] = 'on_demand_not_running'
+        if role_absent:
+            candidates[unit]['availability'] = 'unconfigured_offline'
+        elif offline and unit in CAMPAIGN_UNITS:
+            invalid.add(unit)
     units = {unit: candidates[unit] if unit in candidates and unit not in invalid else {'state': 'unknown'}
              for unit in UNITS}
     complete = all(item['state'] == 'observed' for item in units.values())
@@ -241,7 +265,11 @@ def _collector(machine, ledger_identity, current_boot, observed):
                 metrics=metrics)
 
 
-def _campaign(db, machine, ledger_identity, observed):
+def _campaign(db, machine, ledger_identity, observed, *, offline=False):
+    if offline:
+        return dict(state='intentional_idle', install_phase='unconfigured',
+                    authorization_state='not_granted', request_units_used=0,
+                    request_units_held=0, budget_limit_units=0, budget_unit='provider_request')
     state = _receipt(CAMPAIGN_STATE, 'superagent.agent_campaign.install.v1', machine)
     phase = state['phase']
     _check(state['ledger_identity'] == ledger_identity)
@@ -336,6 +364,7 @@ def operational_snapshot(db, source, observed_at):
     """Return an observation window, preserving the existing Manager status contract."""
     try:
         machine, ledger_identity = _current_source(db, source)
+        offline = _offline_mode(machine, ledger_identity)
     except READ_ERRORS:
         observations = {name: dict(state='unknown', observed_at=None)
                         for name in ('ledger', 'boot', 'systemd', 'collector', 'campaign')}
@@ -344,10 +373,10 @@ def operational_snapshot(db, source, observed_at):
     else:
         observations = {'ledger': dict(state='observed', observed_at=observed_at)}
         observations['boot'] = _observe(lambda _: _boot())
-        observations['systemd'] = _observe(lambda _: _systemd())
+        observations['systemd'] = _observe(lambda _: _systemd(offline=offline))
         boot = observations['boot'].get('boot_id')
         observations['collector'] = _observe(lambda at: _collector(machine, ledger_identity, boot, instant(at)))
-        observations['campaign'] = _observe(lambda at: _campaign(db, machine, ledger_identity, instant(at)))
+        observations['campaign'] = _observe(lambda at: _campaign(db, machine, ledger_identity, instant(at), offline=offline))
         unknown = [name for name, item in observations.items() if item['state'] in ('unknown', 'partial')]
     return dict(schema=SCHEMA, kind='operational_snapshot', as_of=observed_at, non_atomic=True,
                 observation_started_at=observed_at, observation_completed_at=now(),

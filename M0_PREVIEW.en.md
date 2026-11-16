@@ -94,6 +94,8 @@ Manager adds [operational and handoff queries](tools/m0_manager/README.en.md) fo
 
 The preview adds [operational observation of the shared coordinator and Collector](tools/m0_manager/SOAK.en.md). The development VM started a 24-hour window, with full-window validation pending.
 
+The preview adds [unified offline installation](tools/m0_installer/COMPOSED.en.md) on a fresh Debian system. It prepares the 0013 shared ledger and collection service with model execution blocked.
+
 ## Sandbox and delivery progress
 
 An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.

@@ -43,6 +43,14 @@ SYSTEM_PYTHON = Path('/usr/bin/python3')
 OLD_SERVICES = (SYSTEMD / HTTP, DROPINS / '10-m0-lab-port.conf', DROPINS / 'native-mixed-guard.conf', LOCAL_ENTRY)
 BASE_CONFIGS = ('install-target.json', 'coordinator.toml', 'local.toml', 'manager-binding.json', 'collector-binding.json')
 AGENT_CONFIGS = ('agent-external.json', 'provider-network.json')
+OFFLINE_MARKER = '# superagent.execution_mode=offline'
+OFFLINE_PHASE = 'sealing-offline'
+CAMPAIGN_CONFIG = Path('/etc/sa-dispatch-agent-campaign')
+CAMPAIGN_AUTHORITY = Path('/var/lib/sa-dispatch-agent-campaign')
+CAMPAIGN_UNITS = tuple(f'sa-agent-{role}.{kind}' for role in ('producer', 'reviewer') for kind in ('service', 'timer'))
+CREDENTIAL_STORES = tuple(Path(path) for path in ('/run/credstore', '/etc/credstore', '/usr/lib/credstore',
+                                                  '/run/credstore.encrypted', '/etc/credstore.encrypted',
+                                                  '/usr/lib/credstore.encrypted'))
 STREAMS = ('events', 'schedule_events', 'control_events')
 HEX = re.compile(r'[0-9a-f]{64}')
 COMPONENT = re.compile(r'[A-Za-z0-9_.-]{1,128}')
@@ -215,6 +223,44 @@ def _config_hashes(names):
     return hashes
 
 
+def _verify_offline_ledger():
+    from dispatch.sa_dispatch.agent_control import BUDGET_ID
+    from dispatch.sa_dispatch.campaign_validation import DEVICES, PREFIX
+    from dispatch.sa_dispatch.routing import EXTERNAL_ROUTE
+
+    with closing(sqlite3.connect(LEDGER.as_uri() + '?mode=ro', uri=True)) as conn:
+        conn.execute('BEGIN')
+        for table in ('tasks', 'schedules', 'schedule_firings', 'devices', 'route_audit'):
+            _require(conn.execute(f'SELECT 1 FROM {table} WHERE execution_route=? LIMIT 1',
+                                  (EXTERNAL_ROUTE,)).fetchone() is None, 'external execution footprint exists')
+        identities = (ACCOUNT, *DEVICES.values())
+        _require(conn.execute('SELECT 1 FROM devices WHERE device_id IN (?,?,?) LIMIT 1', identities).fetchone() is None
+                 and conn.execute("""SELECT 1 FROM route_audit WHERE object_table='devices'
+                     AND object_id IN (?,?,?) LIMIT 1""", identities).fetchone() is None,
+                 'external device identity exists')
+        for table in ('control_budgets', 'control_task_rules', 'control_reservations'):
+            _require(conn.execute(f'SELECT 1 FROM {table} WHERE budget_id=? OR budget_id GLOB ? LIMIT 1',
+                                  (BUDGET_ID, PREFIX + '*')).fetchone() is None, 'external request budget exists')
+        for table, column in (('schedules', 'id'), ('schedule_firings', 'schedule_id'), ('control_handoffs', 'handoff_id')):
+            _require(conn.execute(f'SELECT 1 FROM {table} WHERE {column} GLOB ? LIMIT 1',
+                                  (PREFIX + '*',)).fetchone() is None, 'campaign execution footprint exists')
+
+
+def _verify_offline():
+    credentials = tuple(path / 'provider_api_key' for path in (*CREDENTIAL_STORES,
+                        *(Path('/run/credentials') / unit for unit in (AGENT, *CAMPAIGN_UNITS))))
+    forbidden = (*(CONFIG / name for name in AGENT_CONFIGS), CAMPAIGN_CONFIG, CAMPAIGN_AUTHORITY, *credentials)
+    _require(not any(os.path.lexists(path) for path in forbidden), 'model configuration or credential location exists')
+    _require(_property(TIMER, 'UnitFileState') == 'disabled'
+             and all(_property(unit, 'ActiveState') in ('inactive', 'failed') for unit in (TIMER, AGENT)),
+             'external model unit or timer is not closed')
+    _require(all(_property(unit, 'LoadState') == 'not-found' for unit in CAMPAIGN_UNITS),
+             'campaign model systemd unit exists')
+    _require(all(not _property(unit, 'DropInPaths') for unit in (AGENT, TIMER)),
+             'external model unit has an unmanaged override')
+    _verify_offline_ledger()
+
+
 def _valid_share(path, expected_uid, *, directory):
     info = path.lstat()
     kind = stat.S_ISDIR if directory else stat.S_ISREG
@@ -259,7 +305,7 @@ def _share_ledger():
         os.chmod(path, mode)
 
 
-def _unit_bytes(release, machine, manifest):
+def _unit_bytes(release, machine, manifest, *, offline=False):
     store = LEDGER.parent
     args = f'--expected-machine {machine} --manifest-sha256 {manifest}'
     installer = f'/usr/bin/python3 -I -B {release / ENTRY}'
@@ -279,6 +325,10 @@ def _unit_bytes(release, machine, manifest):
              'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nUMask=0007\nTimeoutStartSec=85\n'
              f'ReadWritePaths={store}\nLoadCredential=provider_api_key\n{guard}'
              f'ExecStart={lock} /usr/bin/python3 -I -B {release / "tools/m0_agent/common_runtime.py"} tick\n')
+    if offline:
+        agent = (f'{OFFLINE_MARKER}\n[Unit]\nDescription=Common Dispatch external slot disabled\n'
+                 '[Service]\nType=oneshot\n'
+                 f'ExecStartPre=+{installer} agent-guard {args}\nExecStart=/usr/bin/false\n')
     timer = ('[Unit]\nDescription=Wake the common Dispatch single-slot agent\n'
              f'[Timer]\nOnBootSec=30s\nOnUnitInactiveSec=30s\nAccuracySec=2s\nUnit={AGENT}\n'
              '[Install]\nWantedBy=timers.target\n')
@@ -419,6 +469,44 @@ def _recover(name, expected_version):
             'ledger_version': expected_version}
 
 
+def _recover_offline():
+    from tools.m0_agent import common_recovery as recovery
+
+    name = 'pre-offline-0013'
+    archive = AUTHORITY / name
+    quarantine = AUTHORITY / ('quarantine-' + name)
+    receipt = recovery.capture(recovery.RecoveryLayout(), archive, offline=True)
+    digest = receipt['manifest_sha256']
+    _require(receipt['ledger_version'] == '0013', 'offline recovery requires the common 0013 ledger')
+    if os.path.lexists(quarantine):
+        recovery._private(quarantine, directory=True)
+    if not os.path.lexists(quarantine) or not any(quarantine.iterdir()):
+        restored = recovery.restore_to_quarantine(archive, quarantine, expected_manifest_sha256=digest)
+        _require(restored['restore_verified'] is True and restored['external_execution_enabled'] is False,
+                 'offline quarantine restore did not verify')
+    else:
+        # A previous attempt may have committed the atomic quarantine rename
+        # before it reached the ready state. Reverify that exact isolated copy.
+        _, entries, raw = recovery._verified(archive, digest)
+        folders = {alias for alias, entry in entries.items() if entry['kind'] == 'directory'}
+        files = set(entries) - folders
+        _require(recovery._inventory(quarantine) ==
+                 (folders | recovery._ancestor_folders(set(entries)),
+                  files | {recovery.MANIFEST, recovery.QUARANTINE_MARKER}),
+                 'existing offline quarantine inventory differs')
+        marker = {'schema': recovery.QUARANTINE_SCHEMA, 'manifest_sha256': digest, 'ledger_version': '0013',
+                  'credential_injection': False, 'timer_enabled': False,
+                  'external_execution_enabled': False, 'services_started': False}
+        _require(recovery._read(quarantine / recovery.MANIFEST)[0] == raw
+                 and recovery._read(quarantine / recovery.QUARANTINE_MARKER)[0] == recovery.canonical(marker),
+                 'existing offline quarantine receipt differs')
+        for alias in files:
+            payload, _ = recovery._read(quarantine / alias, max_bytes=entries[alias]['bytes'])
+            _require(len(payload) == entries[alias]['bytes'] and sha256(payload).hexdigest() == entries[alias]['sha256'],
+                     'existing offline quarantine member differs')
+    return {'manifest_sha256': digest, 'restore_verified': True, 'ledger_version': '0013'}
+
+
 class _Installer:
     def __init__(self, release, machine, manifest):
         self.release, self.machine, self.manifest = release, machine, manifest
@@ -432,6 +520,11 @@ class _Installer:
         document = json.loads(_root_bytes(self.state_file, private=True), object_pairs_hook=_unique_fields)
         _require(isinstance(document, dict) and all(document.get(key) == value for key, value in self._base().items()),
                  'addon receipt belongs to a different manifest or machine')
+        _require('execution_mode' not in document or document['execution_mode'] == 'offline',
+                 'unknown common execution mode')
+        _require((document['phase'] != OFFLINE_PHASE or document.get('execution_mode') == 'offline')
+                 and (document.get('execution_mode') != 'offline' or document['phase'] in (OFFLINE_PHASE, 'ready')),
+                 'inconsistent common execution mode')
         return document
 
     def _save(self, data, phase, **extra):
@@ -442,9 +535,12 @@ class _Installer:
     def _verify_installed(self, data):
         _require(_check_schema() == ('0013', data['ledger_identity']), 'installed common ledger identity changed')
         _require(_config_hashes(BASE_CONFIGS) == data['base_config_hashes'], 'base configuration drift blocks startup')
-        checked = self._managed_files()
-        _require(all(_root_hash(path) == checksum for path, checksum in checked.items()),
-                 'guarded service or launcher bytes changed')
+        managed = self._managed_files(offline=data.get('execution_mode') == 'offline')
+        for path, checksum in managed.items():
+            allowed = {checksum}
+            if data['phase'] == OFFLINE_PHASE and path == SYSTEMD / AGENT:
+                allowed.add(self._managed_files()[path])
+            _require(_root_hash(path) in allowed, 'guarded service or launcher bytes changed')
         _require(set(DROPINS.iterdir()) == {DROPIN, *OLD_SERVICES[1:3]}, 'common HTTP unit drop-ins changed')
         old_hashes = {path.name: _root_hash(path) for path in OLD_SERVICES[:3]}
         _require(old_hashes == data['original_unit_hashes'], 'underlying common unit or original drop-ins changed')
@@ -457,8 +553,8 @@ class _Installer:
             _require(info.st_gid == group and stat.S_IMODE(info.st_mode) == (0o2770 if directory else 0o660),
                      'common ledger or CAS is no longer shared through the dedicated group')
 
-    def _managed_files(self):
-        intended = _unit_bytes(self.release, self.machine, self.manifest)
+    def _managed_files(self, *, offline=False):
+        intended = _unit_bytes(self.release, self.machine, self.manifest, offline=offline)
         return {path: sha256(raw).hexdigest() for path, (raw, _) in intended.items()}
 
     def install(self):
@@ -471,7 +567,7 @@ class _Installer:
         with _lock(MAINTENANCE_LOCK):
             if self.state_file.exists():
                 state = self._read_state()
-                _require(state['phase'] in ('prepared', 'ready'),
+                _require(state['phase'] in ('prepared', 'ready', OFFLINE_PHASE),
                          'interrupted upgrade; preserve its receipt and review offline')
                 self._verify_installed(state)
                 return state
@@ -530,6 +626,7 @@ class _Installer:
 
         with _lock(MAINTENANCE_LOCK):
             data = self._read_state()
+            _require(data.get('execution_mode') != 'offline', 'offline common installation cannot enable the model slot')
             if data['phase'] == 'ready':
                 data = self.guard()
             else:
@@ -555,20 +652,59 @@ class _Installer:
             _systemctl('start', HTTP)
             return data
 
+    def seal_offline(self):
+        from tools.m0_native_mixed.maintenance import _lock
+
+        with _lock(MAINTENANCE_LOCK):
+            data = self._read_state()
+            if data['phase'] == 'ready':
+                _require(data.get('execution_mode') == 'offline', 'ready legacy installation cannot be sealed offline')
+                data = self.guard()
+            else:
+                _require(data['phase'] in ('prepared', OFFLINE_PHASE), 'common addon is not prepared for offline sealing')
+                self._verify_installed(data)
+                _verify_inactive()
+                _verify_offline()
+                if data['phase'] == 'prepared':
+                    data = self._save(data, OFFLINE_PHASE, execution_mode='offline')
+                agent = SYSTEMD / AGENT
+                raw, mode = _unit_bytes(self.release, self.machine, self.manifest, offline=True)[agent]
+                if _root_hash(agent) != sha256(raw).hexdigest():
+                    _atomic(agent, raw, mode=mode)
+                _systemctl('daemon-reload')
+                _verify_inactive()
+                _verify_offline()
+                post = _recover_offline()
+                self._verify_installed(data | {'phase': 'ready'})
+                _verify_offline()
+                data = self._save(data, 'ready', pre_live_recovery=post)
+            self.guard()
+            _systemctl('start', HTTP)
+            return data
+
     def guard(self):
         data = self._read_state()
         _require(data['phase'] == 'ready' and data['pre_live_recovery']['restore_verified'] is True,
                  'common external restart guard is closed')
         self._verify_installed(data)
-        _require(_config_hashes(AGENT_CONFIGS) == data['agent_config_hashes'],
-                 'agent grant or provider network configuration changed')
+        if data.get('execution_mode') == 'offline':
+            _require('agent_config_hashes' not in data, 'offline common authority unexpectedly names model configurations')
+            _verify_offline()
+        else:
+            _require(_config_hashes(AGENT_CONFIGS) == data['agent_config_hashes'],
+                     'agent grant or provider network configuration changed')
         return data
+
+    def agent_guard(self):
+        _require(self._read_state().get('execution_mode') != 'offline',
+                 'offline common installation cannot enable the model slot')
+        return self.guard()
 
     def enable_timer(self):
         from tools.m0_native_mixed.maintenance import _lock
 
         with _lock(MAINTENANCE_LOCK):
-            data = self.guard()
+            data = self.agent_guard()
             _require(_property(HTTP, 'ActiveState') == 'active', 'HTTP coordinator needs to be active first')
             _systemctl('enable', '--now', TIMER)
             _require(_property(TIMER, 'ActiveState') == 'active', 'agent timer could not be activated')
@@ -602,7 +738,8 @@ class _Installer:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument('command', choices=('install', 'seal', 'guard', 'status', 'enable-timer', 'local-run'))
+    parser.add_argument('command', choices=('install', 'seal', 'seal-offline', 'guard', 'agent-guard',
+                                             'status', 'enable-timer', 'local-run'))
     parser.add_argument('--expected-machine', required=True)
     parser.add_argument('--manifest-sha256', required=True)
     args, rest = parser.parse_known_args(argv)

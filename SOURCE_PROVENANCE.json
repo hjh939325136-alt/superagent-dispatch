@@ -14,19 +14,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "c2499622d6b44327e4d5a6ff0046114b0c4a866a106464abaa4022a3746d6a44"
+    "staged_sha256": "bedc15bb71ecb496b57a4aee217144cf6ff4fd63af189e68fdcf28cab788f3a3"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "38f48d75b4f74ffede984302b375a11949564c36268b95c2ff685bffa689140c"
+    "staged_sha256": "519a865427ddd70c4a89a7c33e476475a832fe4ab7f1e15c599c206dc54fbd07"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "8438b34c364608987c0ee0763b36e5492e8e55c76a1543a87e0f8d5075b15711"
+    "staged_sha256": "7fc14bf05e6aaa6bc1d895f0ed9bb96b094a49cd8e937e514850f66c2fcdb2b9"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "03bbc81a6ff6477995add807d348590c995414dc2266ca70dda981fef660affa"
+    "staged_sha256": "3e4d15ced24dd41fde8df650d5f38620fff8865b050e741b2dfe5dc0a993c78a"
   },
   "dispatch/LICENSE": {
     "source": "dispatch/LICENSE",
@@ -1214,8 +1214,8 @@
   },
   "tools/m0_agent/common_install.py": {
     "source": "tools/m0_agent/common_install.py",
-    "source_sha256": "b129c4950df89241c14e54d3d4c31416f31e50c18e177b61cde1fab130b09415",
-    "staged_sha256": "b129c4950df89241c14e54d3d4c31416f31e50c18e177b61cde1fab130b09415"
+    "source_sha256": "12376a296b5df34baf7076a6b9ec8cb4f8abe8fb3bc99cbeac5a31d048753792",
+    "staged_sha256": "12376a296b5df34baf7076a6b9ec8cb4f8abe8fb3bc99cbeac5a31d048753792"
   },
   "tools/m0_agent/common_lab.py": {
     "source": "tools/m0_agent/common_lab.py",
@@ -1224,8 +1224,8 @@
   },
   "tools/m0_agent/common_package.py": {
     "source": "tools/m0_agent/common_package.py",
-    "source_sha256": "f4cf97c4ec5a0bdf56b755e4f07c683d85d1ad2e43020175767e235bcc3ad5d5",
-    "staged_sha256": "f4cf97c4ec5a0bdf56b755e4f07c683d85d1ad2e43020175767e235bcc3ad5d5"
+    "source_sha256": "2bd5cf95df9dcc8645e6bfba92131815ca739ad1275421f8a0e6eb39cdb1c432",
+    "staged_sha256": "2bd5cf95df9dcc8645e6bfba92131815ca739ad1275421f8a0e6eb39cdb1c432"
   },
   "tools/m0_agent/common_recovery.py": {
     "source": "tools/m0_agent/common_recovery.py",
@@ -1234,8 +1234,8 @@
   },
   "tools/m0_agent/common_runtime.py": {
     "source": "tools/m0_agent/common_runtime.py",
-    "source_sha256": "60c3ff2b425f9e6d61006bd2031f08df0ed2d58a839be608810f1c10b470e13e",
-    "staged_sha256": "60c3ff2b425f9e6d61006bd2031f08df0ed2d58a839be608810f1c10b470e13e"
+    "source_sha256": "4bb80c34215958c728adbe335957653fc25a1552f14151d7fc129719e8f544c3",
+    "staged_sha256": "4bb80c34215958c728adbe335957653fc25a1552f14151d7fc129719e8f544c3"
   },
   "tools/m0_agent/common_worker.py": {
     "source": "tools/m0_agent/common_worker.py",
@@ -1322,10 +1322,15 @@
     "source_sha256": "825ac21b0c40fc9c8915c4215d43b61848f93f9b0ea810dc92c81748e3a7261e",
     "staged_sha256": "825ac21b0c40fc9c8915c4215d43b61848f93f9b0ea810dc92c81748e3a7261e"
   },
+  "tools/m0_agent/test_common_offline_install.py": {
+    "source": "tools/m0_agent/test_common_offline_install.py",
+    "source_sha256": "b5ac43d28513327bdcff69b9431721b5d826dfae36f03b6f31fd6b3b232ff6e2",
+    "staged_sha256": "b5ac43d28513327bdcff69b9431721b5d826dfae36f03b6f31fd6b3b232ff6e2"
+  },
   "tools/m0_agent/test_common_package.py": {
     "source": "tools/m0_agent/test_common_package.py",
-    "source_sha256": "bdd65a5b9bb469ea25ffa313787aaee04004c3a612fb7aa52bd37afc834f686c",
-    "staged_sha256": "bdd65a5b9bb469ea25ffa313787aaee04004c3a612fb7aa52bd37afc834f686c"
+    "source_sha256": "fac15eaa5e0a20cd06c83c70bcba7f0025c5fe3507b81e64e31472584c7c4425",
+    "staged_sha256": "fac15eaa5e0a20cd06c83c70bcba7f0025c5fe3507b81e64e31472584c7c4425"
   },
   "tools/m0_agent/test_common_process.py": {
     "source": "tools/m0_agent/test_common_process.py",
@@ -1479,6 +1484,14 @@
     "source": "public preview documentation",
     "staged_sha256": "cf1794f3119044a4e44c570dd4a140a4accefea88cc1513cf6b3ab37978bd5a9"
   },
+  "tools/m0_installer/COMPOSED.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "10b473a4d8b3c7789b103fc88f2d9536534425b10a6b31bf8460b1fef3dc6adb"
+  },
+  "tools/m0_installer/COMPOSED.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "9fc4d5020efef526fa8f195fbd06de885e0febb33b74304a7ff90c58166933d7"
+  },
   "tools/m0_installer/README.en.md": {
     "source": "public preview documentation",
     "staged_sha256": "5e7a640f058d43fbf5b07366c8de524f98571891669495469cccf8250dbca315"
@@ -1511,6 +1524,11 @@
     "source": "tools/m0_installer/common_baseline.py",
     "source_sha256": "673c4c6f7c5a0dfd51801a372ba5db909ad384fffb7525a002df2a2b172b502b",
     "staged_sha256": "673c4c6f7c5a0dfd51801a372ba5db909ad384fffb7525a002df2a2b172b502b"
+  },
+  "tools/m0_installer/composed.py": {
+    "source": "tools/m0_installer/composed.py",
+    "source_sha256": "d67c0985a60df58ddae7a35ae552cb6c5e70c625bd218ee2a39c7126744a638b",
+    "staged_sha256": "d67c0985a60df58ddae7a35ae552cb6c5e70c625bd218ee2a39c7126744a638b"
   },
   "tools/m0_installer/credentials.py": {
     "source": "tools/m0_installer/credentials.py",
@@ -1547,6 +1565,11 @@
     "source_sha256": "d5ebc0c1e12d24ac2f5782b01013f740a968ba866116ffde18ba0958d2d863ab",
     "staged_sha256": "d5ebc0c1e12d24ac2f5782b01013f740a968ba866116ffde18ba0958d2d863ab"
   },
+  "tools/m0_installer/test_composed.py": {
+    "source": "tools/m0_installer/test_composed.py",
+    "source_sha256": "4d94394ef4cd3de44888a78077d71edcc7cdd7c7f2e48916bdcdc1aa154d7a4f",
+    "staged_sha256": "4d94394ef4cd3de44888a78077d71edcc7cdd7c7f2e48916bdcdc1aa154d7a4f"
+  },
   "tools/m0_installer/test_r1.py": {
     "source": "tools/m0_installer/test_r1.py",
     "source_sha256": "c6a5624c8b238e5d766bb4d4c5844608c714a0e710285b536e1fb6a47b17be83",
@@ -1569,11 +1592,11 @@
   },
   "tools/m0_manager/README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "b77dfba2e428372f3ffb9ca4e3c4a8d7414bbdd7acf963571fd050b30f5b2fc6"
+    "staged_sha256": "868adb716a04463981e19d34db4b86cfc9a74ed9897f30fe58b8ee458d3a34e8"
   },
   "tools/m0_manager/README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "c1bda217b08b0670bfea57bf1ad78e76bd73af61c08815c2e5c91ecdc5ecd55d"
+    "staged_sha256": "66d56951fe104ef78005ac2d8b7d6a84b46eed394bca4d7ed51c4a01fa68c9cf"
   },
   "tools/m0_manager/SOAK.en.md": {
     "source": "public preview documentation",
@@ -1655,8 +1678,8 @@
   },
   "tools/m0_manager/operational_sources.py": {
     "source": "tools/m0_manager/operational_sources.py",
-    "source_sha256": "045fc0aa3ebbf5ac95a79bb83bd228d4069ba8f0f3faf6f7a368de7358e4c9d5",
-    "staged_sha256": "045fc0aa3ebbf5ac95a79bb83bd228d4069ba8f0f3faf6f7a368de7358e4c9d5"
+    "source_sha256": "d0b446e9536c82aa38654088a547d6af6418e0a83929c4ef602555dcd4da048e",
+    "staged_sha256": "d0b446e9536c82aa38654088a547d6af6418e0a83929c4ef602555dcd4da048e"
   },
   "tools/m0_manager/readonly.py": {
     "source": "tools/m0_manager/readonly.py",
@@ -1682,6 +1705,11 @@
     "source": "tools/m0_manager/test_manager.py",
     "source_sha256": "65f21c808ca8117e846fc32d8583b86a5e40dee19117a4169634ca152cf38019",
     "staged_sha256": "7fe1ca0b4461cf3478a202d6f0740e34a8fd79159e0b5e2f99644b1bc626f1ed"
+  },
+  "tools/m0_manager/test_offline_operations.py": {
+    "source": "tools/m0_manager/test_offline_operations.py",
+    "source_sha256": "f67961fe75f031e616204ea3183b7c1137a6009145865b823c10a70c8463730e",
+    "staged_sha256": "f67961fe75f031e616204ea3183b7c1137a6009145865b823c10a70c8463730e"
   },
   "tools/m0_manager/test_operational_sources.py": {
     "source": "tools/m0_manager/test_operational_sources.py",

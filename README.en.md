@@ -74,6 +74,8 @@ Manager adds [operational and handoff queries](tools/m0_manager/README.en.md) fo
 
 The preview adds [operational observation of the shared coordinator and Collector](tools/m0_manager/SOAK.en.md). The development VM started a 24-hour window, with full-window validation pending.
 
+The preview adds [unified offline installation](tools/m0_installer/COMPOSED.en.md) on a fresh Debian system. It prepares the 0013 shared ledger and collection service with model execution blocked.
+
 ## Current status
 
 One live model slot has been verified with the shared ledger in an isolated VM. See the [development updates](DEVELOPMENT_UPDATES.en.md) for scope.

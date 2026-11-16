@@ -94,6 +94,8 @@ Manager 新增[运行状态与交接回读](tools/m0_manager/README.md)。在显
 
 新增[共同协调器和 Collector 运行观察](tools/m0_manager/SOAK.md)。开发 VM 已启动 24 小时观察窗口，尚待完整窗口验收。
 
+新增[共同运行栈统一离线安装](tools/m0_installer/COMPOSED.md)。在新 Debian 环境中建立 0013 共同账本和采集服务，模型执行门保持关闭。
+
 ## 沙盒与交付进度
 
 在一台隔离 Debian 虚拟机上，共同账本已从 0012 升级到 0013。同一本账记录了 HTTP 合成任务、本机合成任务和一个获准的真实 DeepSeek 任务。虚拟机重启和重复安装后，该模型任务仍只有一次尝试，已用额度未重置。

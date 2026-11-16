@@ -27,12 +27,14 @@ CAMPAIGN_FILES = frozenset('tools/m0_agent/' + name + '.py' for name in (
     'campaign_control', 'campaign_install', 'campaign_runtime', 'campaign_worker',
 )) | {'dispatch/sa_dispatch/campaign_validation.py'}
 COLLECTOR_FILES = frozenset(('tools/m0_agent/collector_install.py', 'tools/m0_agent/collector_runtime.py'))
+COMPOSED_FILES = frozenset(('tools/m0_installer/composed.py',))
+COMPOSED_DEPENDENCIES = frozenset(('tools/m0_manager/soak_install.py', 'tools/m0_manager/soak_runtime.py'))
 BASE_ADDITIONS = AGENT_FILES | {'dispatch/sa_dispatch/agent_control.py', 'dispatch/sa_dispatch/external_migration.py',
                                 'tools/m0_installer/credentials.py', 'tools/m0_installer/local_secret.py'}
-ADDITIONS = BASE_ADDITIONS | CAMPAIGN_FILES | COLLECTOR_FILES
+ADDITIONS = BASE_ADDITIONS | CAMPAIGN_FILES | COLLECTOR_FILES | COMPOSED_FILES
 LEGACY_REQUIRED = (baseline.REQUIRED | baseline.INSTALLER_SUPPORT | {baseline.INSTALLER, baseline.LICENSE}
                    | BASE_ADDITIONS)
-REQUIRED = LEGACY_REQUIRED | CAMPAIGN_FILES | COLLECTOR_FILES
+REQUIRED = LEGACY_REQUIRED | CAMPAIGN_FILES | COLLECTOR_FILES | COMPOSED_FILES | COMPOSED_DEPENDENCIES
 PackageError = baseline.PackageError
 
 
@@ -48,6 +50,8 @@ def _name_set(names):
         raise PackageError('Campaign source members must form a complete addon')
     if members & COLLECTOR_FILES and not (COLLECTOR_FILES | CAMPAIGN_FILES) <= members:
         raise PackageError('Collector source members require the complete Collector and campaign addons')
+    if members & COMPOSED_FILES and not (COMPOSED_FILES | COMPOSED_DEPENDENCIES | COLLECTOR_FILES | CAMPAIGN_FILES) <= members:
+        raise PackageError('Composed installation requires the complete runtime addons')
     for name in names:
         baseline._archive_path(Path('.'), name)
         if not _allowed(name):

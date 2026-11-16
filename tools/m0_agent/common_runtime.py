@@ -17,7 +17,7 @@ if __package__ in (None, ''):
 from sa_dispatch.artifacts import ArtifactStore
 from sa_dispatch.models import DispatchError, Ref
 
-from . import common_worker
+from . import common_install, common_worker
 from .deepseek_client import allowed_connect_proxy
 from .provider_process import complete_bounded
 from .runtime import read_systemd_key
@@ -87,6 +87,26 @@ def read_provider_network(path):
     return document['https_connect_proxy']
 
 
+def _require_live_mode():
+    if os.name != 'posix':
+        raise ValueError('common agent CLI requires its Linux service account')
+    if os.geteuid() == 0:
+        common_install._root_metadata(common_install.AUTHORITY, directory=True, private=True)
+        receipt = json.loads(common_install._root_bytes(common_install.AUTHORITY / 'state.json', private=True),
+                             object_pairs_hook=_unique_fields)
+        if receipt.get('schema') != common_install.STATE_SCHEMA or 'execution_mode' in receipt:
+            raise ValueError('common agent runtime has no live execution authority')
+    # The worker UID cannot read the private installer receipt. Its fixed,
+    # root-controlled unit carries the offline gate without a second file.
+    unit = common_install.SYSTEMD / common_install.AGENT
+    common_install._root_parents(unit)
+    common_install._root_metadata(unit)
+    with unit.open('rb') as handle:
+        marker = handle.readline(128).rstrip(b'\r\n')
+    if marker == common_install.OFFLINE_MARKER.encode('ascii'):
+        raise ValueError('common agent runtime has no live execution authority')
+
+
 def _verify_service(command):
     if os.name != 'posix':
         raise ValueError('common agent CLI requires its Linux service account')
@@ -122,6 +142,8 @@ def main(argv=None):
     parser.add_argument('command', choices=('register', 'tick', 'status'))
     command = parser.parse_args(argv).command
     try:
+        if command in ('register', 'tick'):
+            _require_live_mode()
         _verify_service(command)
         config = read_config(CONFIG)
         if MACHINE_ID.read_text(encoding='ascii').strip() != config.machine_id:
