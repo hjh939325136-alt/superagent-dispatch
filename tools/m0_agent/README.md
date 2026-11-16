@@ -8,12 +8,14 @@
 - 工作器调用由调用方传入的 provider 函数。`provider_process.complete_bounded` 提供 DeepSeek HTTPS 实现，给整个子进程设定期限。真实调用只应使用明确获准外发的公开或合成文本。凭据由调用方在运行时提供。
 - 收到完整结果后记录引用与用量。输出截断时保留部分结果并标记失败。遇到可能已经发出的超时，任务进入待核实状态，避免自动重试。
 
+直接调用旧接口时，沿用原授权和结果格式，省略 `execution_mode`。显式传入空值的任务参数会被拒绝。已登记的时间槽不能切换模式。排队任务仍可领取，已有结果和待核实状态可以回查。
+
 ## 运行合成测试
 
 使用 Python 3.11 或更新版本，从预览源码根目录运行：
 
 ```sh
-python -X utf8 -B -c "import sys, unittest; sys.path[:0] = ['dispatch', 'dispatch/tests']; unittest.main(module=None)" tools.m0_agent.test_deepseek_client tools.m0_agent.test_provider_process tools.m0_agent.test_worker test_scheduler test_scheduler_bounds test_scheduler_process test_scheduler_routing
+python -X utf8 -B -c "import sys, unittest; sys.path[:0] = ['dispatch', 'dispatch/tests']; unittest.main(module=None)" tools.m0_agent.test_deepseek_client tools.m0_agent.test_provider_process tools.m0_agent.test_worker test_scheduler test_scheduler_bounds test_scheduler_process test_scheduler_routing contract.test_agent_worker_compatibility
 ```
 
 测试覆盖单槽竞争、重复触发、成功与超时、凭据通过子进程管道传递，以及原调度行为。独立 Debian 定时安装演练的范围见[开发更新](../../DEVELOPMENT_UPDATES.md)。长期运行仍待验证。

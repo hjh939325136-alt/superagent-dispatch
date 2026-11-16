@@ -56,6 +56,13 @@ class WorkerTest(unittest.TestCase):
         return run_once(self.store, self.artifacts, grant or self.grant, device_id=device_id,
                         api_key='simulated-key', provider_call=self.complete)
 
+    def test_legacy_wire_omits_mode_and_rejects_explicit_null(self):
+        params = self.grant.template().params
+        self.assertNotIn('execution_mode', params)
+        self.assertEqual(AgentKind().validate(params), params)
+        with self.assertRaises(DispatchError):
+            AgentKind().validate(params | {'execution_mode': None})
+
     def test_submit_before_ack_replay_uses_same_task_and_sends_once(self):
         submit = self.store.submit
 

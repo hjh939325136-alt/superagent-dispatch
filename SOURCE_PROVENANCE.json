@@ -14,19 +14,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "8ec18035d98c1d7e2b2f6c88b452515fa20f17715fd3be84ea399530d704da24"
+    "staged_sha256": "9cc0343c877bebaa907db7b451e17b8316474ed05c2c4cf7ea5f23b0fc5393f0"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "253f4f27c871c5e0b155e9c6b574628db130bf855e2fbcf3ec4f46cd86d1befa"
+    "staged_sha256": "ab068f684cf8770dbd62dc0d62bbc1dec059d74a6f2c887922d623b5bd990b92"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "ecb33f4be96b9a430eef52677e6858a626bc0cded5368623afd279dfde06f0e4"
+    "staged_sha256": "cd53bbbadbf50a8f81dfcb990ebceee3c3bfcf79b47e87fc355b62040120c366"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "259c2aaf50928e04238e06cdd6e6988a5931d41da8ebdb23a654dd4be64a919f"
+    "staged_sha256": "fdea346124ec3f9a73e6b56180394552919a9bdbc4d8687de5d30533d88ba6eb"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -271,6 +271,11 @@
     "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "staged_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
+  "dispatch/tests/contract/test_agent_worker_compatibility.py": {
+    "source": "dispatch/tests/contract/test_agent_worker_compatibility.py",
+    "source_sha256": "cefde8f4b52e94e72ac5e7a626b468f34c0dd563a6ff58d04daf6b945816d3ad",
+    "staged_sha256": "cefde8f4b52e94e72ac5e7a626b468f34c0dd563a6ff58d04daf6b945816d3ad"
+  },
   "dispatch/tests/contract/test_store_sqlite.py": {
     "source": "dispatch/tests/contract/test_store_sqlite.py",
     "source_sha256": "2e6d31458409cbe49d80de7b7f4f5251d647ffb1823a086d1374a175ee55189e",
@@ -280,6 +285,11 @@
     "source": "dispatch/tests/fakes/fake_component.py",
     "source_sha256": "2de6f506afea72437cc4f3663c77f51e942e2abf99599019a74d5fe9c15703fe",
     "staged_sha256": "2de6f506afea72437cc4f3663c77f51e942e2abf99599019a74d5fe9c15703fe"
+  },
+  "dispatch/tests/fixtures/agent_worker_m0_12.py": {
+    "source": "dispatch/tests/fixtures/agent_worker_m0_12.py",
+    "source_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e",
+    "staged_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e"
   },
   "dispatch/tests/fixtures/legacy_bundles/provenance-v1.json": {
     "source": "dispatch/tests/fixtures/legacy_bundles/provenance-v1.json",
@@ -1112,11 +1122,11 @@
   },
   "tools/m0_agent/README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5f1a658b89f2b61bf4f86a8523ac9b7f299b4ea4eec0f3daad1a9d8387332a07"
+    "staged_sha256": "a09ecf513517b11700362d934065defdbe8a5af8d427dbafd9ed2e071b6c7625"
   },
   "tools/m0_agent/README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "6e9b51fbdc7ed7378be2f8712df6e3f884b41764d119e547372e4e7423c5d560"
+    "staged_sha256": "2d44ebc23c7817eaad413a4cf74ab2081f1ad9ad2c254774693646c7ed183335"
   },
   "tools/m0_agent/__init__.py": {
     "source": "tools/m0_agent/__init__.py",
@@ -1145,13 +1155,13 @@
   },
   "tools/m0_agent/test_worker.py": {
     "source": "tools/m0_agent/test_worker.py",
-    "source_sha256": "adeda643255c4cfce8f4f0d6764fa5d361364c714b306a48646f96beb72d330e",
-    "staged_sha256": "adeda643255c4cfce8f4f0d6764fa5d361364c714b306a48646f96beb72d330e"
+    "source_sha256": "4a9d95959fe88bd60922abdd2a8dd3871f0634698ddd04938fedff14938d85d1",
+    "staged_sha256": "4a9d95959fe88bd60922abdd2a8dd3871f0634698ddd04938fedff14938d85d1"
   },
   "tools/m0_agent/worker.py": {
     "source": "tools/m0_agent/worker.py",
-    "source_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e",
-    "staged_sha256": "db932553528ab72808514d6bd662bbcf066709b6b429d17d152a83462d89ea7e"
+    "source_sha256": "93c09deacb10426349da0095ec0afaa76987bb367461c571dee760d65cc8546b",
+    "staged_sha256": "93c09deacb10426349da0095ec0afaa76987bb367461c571dee760d65cc8546b"
   },
   "tools/m0_backup/README.md": {
     "source": "public preview documentation",

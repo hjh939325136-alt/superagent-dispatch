@@ -82,6 +82,8 @@ The [maintenance toolkit](tools/m0_native_mixed/README.en.md) stages a separate 
 
 The preview includes a [one-shot model task example](tools/m0_agent/README.en.md). Developers can bind approved synthetic text to a time slot, let a local worker claim it, and inspect its result and token usage. A simulated timeout leaves the outcome unknown to prevent automatic resubmission.
 
+The one-shot worker can resume grants and time slots recorded by `0.1.1-m0.12`. Replaying a terminal task returns its original result or unknown status without another submission.
+
 ## Sandbox and delivery progress
 
 A systemd timer completed one synthetic task in an isolated Debian sandbox. Reinstalling and starting the service again kept one task and one attempt in the ledger. Debian passed 46 tests. Windows passed 45 and skipped one POSIX-only check. A simulator supplied the model response. Real model calls: 0.

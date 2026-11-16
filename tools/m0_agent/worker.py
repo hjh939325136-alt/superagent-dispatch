@@ -33,6 +33,8 @@ class OperatorGrant:
     max_tokens: int
     scheduled_at: str
     egress: str
+    # None preserves the pre-R1 direct-call contract. It never implies simulation.
+    execution_mode: str | None = None
 
     def __post_init__(self):
         ref = self.prompt_ref
@@ -43,6 +45,7 @@ class OperatorGrant:
             or any(not isinstance(value, str) or not value for value in asdict(ref).values())
             or ref.version == 'latest' or not re.fullmatch(r'sha256:[0-9a-f]{64}', ref.hash)
             or self.source not in ('synthetic', 'public') or self.egress != 'derived'
+            or self.execution_mode not in (None, 'simulation', 'live')
             or self.provider != 'deepseek' or not isinstance(self.model, str)
             or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', self.model)
             or type(self.max_tokens) is not int or not 1 <= self.max_tokens <= MAX_OUTPUT_TOKENS
@@ -61,8 +64,14 @@ class OperatorGrant:
     def fire_key(self):
         return f'sched:{self.grant_id}:v{self.version}:{self.scheduled_at}'
 
+    def params(self):
+        params = asdict(self)
+        if self.execution_mode is None:
+            del params['execution_mode']
+        return params
+
     def template(self):
-        return TaskSpec(self.fire_key, KIND, 1, asdict(self), (self.prompt_ref,),
+        return TaskSpec(self.fire_key, KIND, 1, self.params(), (self.prompt_ref,),
                         (CAPABILITY,), 'exportable', self.egress, 1)
 
 
@@ -75,7 +84,9 @@ class AgentKind:
 
     def validate(self, params):
         try:
-            return asdict(OperatorGrant(**(params | {'prompt_ref': Ref(**params['prompt_ref'])})))
+            if 'execution_mode' in params and params['execution_mode'] is None:
+                raise DispatchError('legacy mode must omit the execution_mode field')
+            return OperatorGrant(**(params | {'prompt_ref': Ref(**params['prompt_ref'])})).params()
         except (KeyError, TypeError):
             raise DispatchError('invalid agent task parameters') from None
 
@@ -193,11 +204,14 @@ def run_once(store, artifacts, grant, *, device_id, api_key, provider_call):
         if error.outcome_unknown:
             store.mark_unknown(lease.lease_id, lease.fence, error.kind, device_id)
             return store.get_task(task_id)
-        outcome = Outcome('failed', {'error': error.kind, 'http_status': error.status, 'cost': None})
+        identity = {} if grant.execution_mode is None else {'execution_mode': grant.execution_mode, 'provider': grant.provider}
+        outcome = Outcome('failed', {'error': error.kind, 'http_status': error.status, 'cost': None, **identity})
     else:
         artifact_hash = artifacts.put(completion.text.encode('utf-8'))
+        identity = {} if grant.execution_mode is None else {'execution_mode': grant.execution_mode, 'provider': grant.provider}
         outcome = Outcome('failed' if completion.truncated else 'succeeded', {
             'response_id': completion.response_id, 'model': completion.model,
+            **identity,
             'finish_reason': completion.finish_reason, 'truncated': completion.truncated,
             'usage': asdict(completion.usage), 'cost': None, 'result_ref': artifact_hash,
         }, (Evidence('agent_result', artifact_hash, 'local_only', artifact_hash=artifact_hash),))

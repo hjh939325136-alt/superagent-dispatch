@@ -62,6 +62,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 预览新增[单次模型任务示例](tools/m0_agent/README.md)。开发者可以演练如何把一份获准的合成文本绑定到一个时间槽，由本机工作器领取，再回查结果与 token 用量。模拟超时会把任务标成待核实，以避免自动重复发送。
 
+单次模型任务工作器可以继续使用 `0.1.1-m0.12` 登记的授权和时间槽。回查已结束的任务会返回原结果或待核实状态，避免重复提交。
+
 ## 当前进度
 
 目前公开的是单机样例和实验维护工具。最新的适配器与安装演练进度见[开发更新](DEVELOPMENT_UPDATES.md)。

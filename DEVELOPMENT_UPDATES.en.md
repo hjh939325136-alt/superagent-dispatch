@@ -117,3 +117,11 @@ This release adds a one-shot model task example. Use synthetic text to rehearse 
 A systemd timer completed one synthetic task in an isolated Debian sandbox. Reinstalling and starting the service again kept one task and one attempt in the ledger. Debian passed 46 tests. Windows passed 45 and skipped one POSIX-only check. A simulator supplied the model response. Real model calls: 0.
 
 The public preview continues to use the one-shot model task example. Compatibility with existing preview ledgers, the installation image, and long-running operation still need validation.
+
+## 0.1.1-m0.13 (2026-11-16)
+
+The one-shot worker can resume grants and tasks recorded by 0.1.1-m0.12 and return their original results.
+
+- Legacy calls keep their original grant and result formats. Explicit null mode is rejected, and a registered time slot cannot switch modes.
+- The tests use the original worker source to create synthetic ledgers and exercise queued work, a lost acknowledgement after commit, lease expiry, and terminal replay. Existing tasks retain their identity and attempt count.
+- The public package passed 69 tests on each of Windows and Debian with zero real model calls. Validation covers the portable worker and scheduler. The installer package has its own validation.
