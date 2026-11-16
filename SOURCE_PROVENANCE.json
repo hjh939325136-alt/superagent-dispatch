@@ -10,19 +10,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "9b9de1f9e5cd4210f966cd9d79d72f8f5e56c7f5213f05a8fc67d3941d892f8a"
+    "staged_sha256": "aa7fa772b2ab20ca1652c41595401a3221b9cb5803443669bd399240cdae138e"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "2621e8ce8903b15342e3b3cd132cca0a0a0362ddf4b3929b56939e905e79ace8"
+    "staged_sha256": "a2282ab0a4a8de94a9df13f57ec23182fa0867ef07ef416ea7d28453a40e9080"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "1415581a14daaef9185d62d543a661cb3cf98fc2b2c5dcd7293ec3060744f07a"
+    "staged_sha256": "e6157a46881922497bffd4f5b89d2bc79829ff0ffbe487dfabd6b37a156c547a"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "1e779c27b99b2d93dcd4e6d8921447781734ab8e2bc1675b6b3939b44424cb7e"
+    "staged_sha256": "8e99795a9306a12c9f28cca3c46055e5711652888a17da4c50838a3a338d4e85"
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
@@ -1245,6 +1245,39 @@
     "source": "tools/m0_manager/test_protocol.py",
     "source_sha256": "2fc7f990feaee4113508b707304242274c4cc78a4e3c35673fc574f6ccde72a2",
     "staged_sha256": "2fc7f990feaee4113508b707304242274c4cc78a4e3c35673fc574f6ccde72a2"
+  },
+  "tools/m0_native_mixed/README.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "06e64d03d8a94cab055da3df234b33d047bb77423cf75e6cb606e771f5da523c"
+  },
+  "tools/m0_native_mixed/README.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "e4cbc2a3b290676a3500f97104b40bf5faa66e28858f6851e1ebccfc6b65ba11"
+  },
+  "tools/m0_native_mixed/__init__.py": {
+    "source": "tools/m0_native_mixed/__init__.py",
+    "source_sha256": "990c135cf5d4870202c4bc723405bb7e7d17e4a17bc53d6beddb519d7a747444",
+    "staged_sha256": "990c135cf5d4870202c4bc723405bb7e7d17e4a17bc53d6beddb519d7a747444"
+  },
+  "tools/m0_native_mixed/domains.py": {
+    "source": "tools/m0_native_mixed/domains.py",
+    "source_sha256": "92bf1965806b8dc51b6133588093c36d68e631c99947845ded8455e50a399d21",
+    "staged_sha256": "92bf1965806b8dc51b6133588093c36d68e631c99947845ded8455e50a399d21"
+  },
+  "tools/m0_native_mixed/maintenance.py": {
+    "source": "tools/m0_native_mixed/maintenance.py",
+    "source_sha256": "964b1b98bcf5af58d86af25e4ff929e7d19db3cf1acbe232ff2c1148e4cb990e",
+    "staged_sha256": "964b1b98bcf5af58d86af25e4ff929e7d19db3cf1acbe232ff2c1148e4cb990e"
+  },
+  "tools/m0_native_mixed/test_domains.py": {
+    "source": "tools/m0_native_mixed/test_domains.py",
+    "source_sha256": "2e8b0c77a532edd01643b1c0faf8c84ece3044e3c1e921f1fc1c996b41904beb",
+    "staged_sha256": "2e8b0c77a532edd01643b1c0faf8c84ece3044e3c1e921f1fc1c996b41904beb"
+  },
+  "tools/m0_native_mixed/test_maintenance.py": {
+    "source": "tools/m0_native_mixed/test_maintenance.py",
+    "source_sha256": "198eceebe41884646ee8d3c1fee185cafee82c7ee95f61e05667089d62a0bc09",
+    "staged_sha256": "198eceebe41884646ee8d3c1fee185cafee82c7ee95f61e05667089d62a0bc09"
   },
   "tools/m0_portable/backup_target.py": {
     "source": "tools/m0_portable/backup_target.py",

@@ -89,3 +89,11 @@ A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in 
 The delivery plan is to use an automated installation USB drive on-site with a verified new blank SSD. The installation image and virtual-machine validation are still pending, so the USB drive is not ready for delivery.
 
 The sandbox uses the already published `0.1.1-m0.10` source.
+
+## 0.1.1-m0.11 (2026-11-16)
+
+The preview adds experimental tools for staging synthetic domains and resuming interrupted mixed-mode activation.
+
+- Staging prepares a separate synthetic research and content directory and checks its configuration and bindings. The source ledger and evidence store stay untouched.
+- Persistent phases coordinate stopping writes, activation, and configuration replacement. Tests use real SQLite/CAS with synthetic adapters and simulate interruption by raising exceptions at 24 points.
+- A real Debian adapter, a complete recovery set, systemd start guards, and live Collector adoption are still pending. The dedicated sandbox still runs in isolated mode.

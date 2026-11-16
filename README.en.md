@@ -51,6 +51,8 @@ A separate central maintenance entry point can configure shared budgets, record 
 
 Offline checkpoints can now preserve supported ignored late receipts after an explicit per-row review. They remain audit history and cannot establish task completion. A synthetic test also verifies freezing and explicitly resuming each Collector stream across `0011` to `0012`.
 
+This preview also includes an [experimental maintenance toolkit](tools/m0_native_mixed/README.en.md) for staging synthetic research and content directories and rehearsing interrupted mixed-mode activation. The real Debian adapter and live Collector adoption are still in development.
+
 ## Current status
 
 The public source has been tested with local examples on Windows and isolated Debian. The demos use synthetic material and simulated review. A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.

@@ -76,6 +76,10 @@ The checks use Python and synthetic data, including fixtures for older task reco
 
 This public source preview was tested with local synthetic examples on Windows and isolated Debian.
 
+## Experimental mixed-mode maintenance
+
+The [maintenance toolkit](tools/m0_native_mixed/README.en.md) stages a separate synthetic domain and coordinates one mixed-mode activation through persistent phases. Tests use real SQLite, CAS, and activation transactions with synthetic service and recovery adapters. Exceptions simulate interruption at 24 points. Physical power-loss testing, a real Debian adapter, a complete recovery set, systemd start guards, and live Collector adoption remain pending.
+
 ## Sandbox and delivery progress
 
 A dedicated synthetic Debian sandbox has been upgraded from `0011` to `0012` in isolated mode. Post-upgrade checks verified historical tasks, ignored late audit, unified events, Collector cursors, and evidence objects. Mixed-mode activation, native research and content integration, and explicit adoption of each Collector stream are still pending. Full M0 is still in progress.
