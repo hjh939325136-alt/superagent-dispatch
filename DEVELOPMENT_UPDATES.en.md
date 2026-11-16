@@ -142,3 +142,11 @@ The development candidate includes a common-source builder and offline verifier 
 The distribution is `source_candidate` and `installer_entry` is `null`. The common installer entry point is still in development. Target validation compares the expected manifest digest and machine identity. Fresh VM installation and real systemd startup still need verification.
 
 The same development candidate passed 45 tests on Windows and 35 on Debian. The 10 developer-side build tests ran only on Windows because the Debian test environment had no Git. Target-side offline verification passed on Debian. This update documents the progress while the public build dependencies are being completed.
+
+## 0.1.1-m0.14-docs.1 (2026-11-16)
+
+The 0013 shared ledger completed an isolated VM milestone. This documentation update describes the results. Public runtime source remains at 0.1.1-m0.14.
+
+- An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.
+- A rehearsal restored the checkpoint to a quarantine directory with execution disabled. Independent-disk disaster recovery and long-running multi-task operation still need validation.
+- The development source depends on a common-install baseline outside the public tree and network settings specific to the test environment. A public deployable package requires separate validation.

@@ -68,6 +68,8 @@ The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en
 
 ## Current status
 
+One live model slot has been verified with the shared ledger in an isolated VM. See the [development updates](DEVELOPMENT_UPDATES.en.md) for scope.
+
 The common-source package is still in development validation. See the [development updates](DEVELOPMENT_UPDATES.en.md).
 
 The public preview includes local examples and experimental maintenance tools. See [development updates](DEVELOPMENT_UPDATES.en.md) for the latest adapter and installation rehearsal progress.

@@ -68,6 +68,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 ## 当前进度
 
+共同账本的隔离虚拟机已验证一个实际模型时间槽。验收范围见[开发更新](DEVELOPMENT_UPDATES.md)。
+
 共同源码包仍处于开发验证阶段。详情见[开发更新](DEVELOPMENT_UPDATES.md)。
 
 目前公开的是单机样例和实验维护工具。最新的适配器与安装演练进度见[开发更新](DEVELOPMENT_UPDATES.md)。

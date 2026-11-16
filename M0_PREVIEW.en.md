@@ -88,6 +88,10 @@ The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en
 
 ## Sandbox and delivery progress
 
+An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.
+
+A rehearsal restored the checkpoint to a quarantine directory with execution disabled. Independent-disk disaster recovery and long-running multi-task operation still need validation.
+
 The development candidate includes a common-source builder and offline verifier for research, content, and synthetic HTTP tasks that use a shared Dispatch ledger. The verifier checks the file set and digests without Git, extraction, or execution of package contents.
 
 The distribution is `source_candidate` and `installer_entry` is `null`. The common installer entry point is still in development. Target validation compares the expected manifest digest and machine identity. Fresh VM installation and real systemd startup still need verification.
