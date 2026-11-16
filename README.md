@@ -68,6 +68,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 共同账本 0013 预览加入[限时双角色任务](tools/m0_agent/CAMPAIGN.md)源码。生产者和审阅者在各自的时间槽内交接，任务、预算和结果引用都可从同一本账回查。
 
+新增 [Debian 常驻 Collector](tools/m0_agent/COLLECTOR.md)。独立定时器在 0013 共同账本上分批维护三条事件流，并提供有界的健康观测。
+
 ## 当前进度
 
 共同账本的隔离虚拟机已验证一个实际模型时间槽。验收范围见[开发更新](DEVELOPMENT_UPDATES.md)。

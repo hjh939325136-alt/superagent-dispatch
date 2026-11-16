@@ -176,3 +176,12 @@ Timed producer and reviewer jobs can rotate to a new grant or cancel an unregist
 - Only an unregistered candidate can be canceled. A missing candidate can be canceled using its original path and reviewed digest. Cancellation is idempotent, registered candidates are refused, and the ledger bytes stay identical across cancellation.
 - The initial verification script compared digests across the cold-backup phase. The corrected check verifies prior row digests and compares ledger bytes immediately before and after cancellation. Cold recovery preserved seven tasks, seven attempts, and three handoffs. Collector lag was zero across three streams. Additional model calls: zero.
 - The public candidate passed 32 focused tests on each of Windows and Debian. A 24-hour soak, long-run budgeting, and native agent integration still need validation.
+
+## 0.1.1-m0.18 (2026-11-16)
+
+Shared ledger 0013 adds a resident Collector for Debian with bounded scheduled batches and recent health observations.
+
+- A dedicated systemd timer maintains three streams. Writes are skipped when the maintenance or ledger lock is busy. Capacity thresholds gate the next batch, while logging limits control the write rate.
+- An isolated Debian VM automatically collected five new events. Neither lock contention case wrote to the ledger. Timed collection resumed after a normal reboot, and all three streams had zero lag.
+- Cold recovery matched seven tables and preserved seven original tasks, seven attempts, three handoffs, and the budgets. Additional model calls: zero.
+- The public candidate passed 63 tests on Windows with one Linux-only lock test skipped, and 61 on Debian. Both source package types were rebuilt and verified offline. A 24-hour soak and full-system delivery still need validation.

@@ -88,6 +88,8 @@ The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en
 
 The shared ledger 0013 preview includes source for [timed producer and reviewer tasks](tools/m0_agent/CAMPAIGN.en.md). The roles hand off work within each slot, with tasks, usage limits, and result references in one ledger.
 
+The preview adds a [resident Collector for Debian](tools/m0_agent/COLLECTOR.en.md). A dedicated timer collects the three shared-ledger streams in bounded batches and reports recent health observations.
+
 ## Sandbox and delivery progress
 
 An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.

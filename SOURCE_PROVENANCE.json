@@ -14,19 +14,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "ff942652fc3250e25429a8e4689f9ac642f7565bb5ea20b5f50bfaf9e45586a4"
+    "staged_sha256": "db24a5913282558c8cc285412c49a88f421c00ed056a2663b613a1ef62d07925"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "7b5bd6d68dacc3da7cddb46c8266267d5aea56b6d592c4a6ed31d5a72f9dcecf"
+    "staged_sha256": "36a7b8e6f75b4f31946450b40a8bc71f8d6ff45c6314b65b27ecd4cd9d1a8a74"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5bcb475563a02c4a670751fe27fe2317a4517de1d7510075f53174ca997ace88"
+    "staged_sha256": "5d4e168b6e41cbc31702cb6a7032d6b4f8445b4573f444ca9ff8be918a70abdc"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "666cc02a4692cdae603eea08cb9dfb078f6f902cbbf1205d6fc2fc499fea7f65"
+    "staged_sha256": "25a44a5ea97f9d1f9ef3954cd0b23554b54b466110c8f45a2fa445ee0e0aff19"
   },
   "dispatch/LICENSE": {
     "source": "dispatch/LICENSE",
@@ -1153,6 +1153,14 @@
     "source": "public preview documentation",
     "staged_sha256": "e5b9b50838bc231f85f58c4f38ec914355ebf4c5dbd05d3caff199e11d3fef48"
   },
+  "tools/m0_agent/COLLECTOR.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "3c62fe4961d8b4d4038b9cfaeffafc0f43bb870783f328444831994de7e788f8"
+  },
+  "tools/m0_agent/COLLECTOR.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "b5a7c3180c69f23692002ecbfab9be2d159090e30ed9877f7f3fad2874b8390a"
+  },
   "tools/m0_agent/README.en.md": {
     "source": "public preview documentation",
     "staged_sha256": "9b2414d0e62f6d7bd6b21467300eb24979dd67993a6675f07aef5d0781db20e2"
@@ -1194,6 +1202,16 @@
     "source_sha256": "1fbaa2573c51d5b2151c27ec2f08ac4f1d8b96ede89f84e9c5056f1d410ac039",
     "staged_sha256": "1fbaa2573c51d5b2151c27ec2f08ac4f1d8b96ede89f84e9c5056f1d410ac039"
   },
+  "tools/m0_agent/collector_install.py": {
+    "source": "tools/m0_agent/collector_install.py",
+    "source_sha256": "5b9e6aebd5d7f87dfbaf3522db88c229ba41bb8ee836d11fe73153d660dbf569",
+    "staged_sha256": "5b9e6aebd5d7f87dfbaf3522db88c229ba41bb8ee836d11fe73153d660dbf569"
+  },
+  "tools/m0_agent/collector_runtime.py": {
+    "source": "tools/m0_agent/collector_runtime.py",
+    "source_sha256": "d676bb0ab51032ae21378ff35b40cca7fb51163b3e767f1e06da4412a92909eb",
+    "staged_sha256": "d676bb0ab51032ae21378ff35b40cca7fb51163b3e767f1e06da4412a92909eb"
+  },
   "tools/m0_agent/common_install.py": {
     "source": "tools/m0_agent/common_install.py",
     "source_sha256": "b129c4950df89241c14e54d3d4c31416f31e50c18e177b61cde1fab130b09415",
@@ -1206,8 +1224,8 @@
   },
   "tools/m0_agent/common_package.py": {
     "source": "tools/m0_agent/common_package.py",
-    "source_sha256": "6025a5eb6219945a7d5fc88cde480a4685e4c3bb54241944e6b0781fdc9260fe",
-    "staged_sha256": "6025a5eb6219945a7d5fc88cde480a4685e4c3bb54241944e6b0781fdc9260fe"
+    "source_sha256": "f4cf97c4ec5a0bdf56b755e4f07c683d85d1ad2e43020175767e235bcc3ad5d5",
+    "staged_sha256": "f4cf97c4ec5a0bdf56b755e4f07c683d85d1ad2e43020175767e235bcc3ad5d5"
   },
   "tools/m0_agent/common_recovery.py": {
     "source": "tools/m0_agent/common_recovery.py",
@@ -1278,6 +1296,16 @@
     "source": "tools/m0_agent/test_campaign_worker.py",
     "source_sha256": "b63b6b379e6ca0cfc777b174c1d8ddfe78645fecb8ea41a16702fd5b99e81e4a",
     "staged_sha256": "b63b6b379e6ca0cfc777b174c1d8ddfe78645fecb8ea41a16702fd5b99e81e4a"
+  },
+  "tools/m0_agent/test_collector_install.py": {
+    "source": "tools/m0_agent/test_collector_install.py",
+    "source_sha256": "677325f51585f2a4aef0895d5a0ca009b185818540370b6ac6c5d76fb73751e0",
+    "staged_sha256": "677325f51585f2a4aef0895d5a0ca009b185818540370b6ac6c5d76fb73751e0"
+  },
+  "tools/m0_agent/test_collector_runtime.py": {
+    "source": "tools/m0_agent/test_collector_runtime.py",
+    "source_sha256": "7700e63f278cf1d2c79cf26c34e8125e8baf8fa0492e73698ef76a9b208aad95",
+    "staged_sha256": "7700e63f278cf1d2c79cf26c34e8125e8baf8fa0492e73698ef76a9b208aad95"
   },
   "tools/m0_agent/test_common_consumers.py": {
     "source": "tools/m0_agent/test_common_consumers.py",
