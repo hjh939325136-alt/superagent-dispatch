@@ -70,6 +70,8 @@ Get-Content -Raw -Encoding utf8 "superagent-dispatch/examples/manager-query.json
 
 新增 [Debian 常驻 Collector](tools/m0_agent/COLLECTOR.md)。独立定时器在 0013 共同账本上分批维护三条事件流，并提供有界的健康观测。
 
+Manager 新增[运行状态与交接回读](tools/m0_manager/README.md)。在显式绑定的 0013 共同账本上查看服务健康和单条交接的账本证据。
+
 ## 当前进度
 
 共同账本的隔离虚拟机已验证一个实际模型时间槽。验收范围见[开发更新](DEVELOPMENT_UPDATES.md)。

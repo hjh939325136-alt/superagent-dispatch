@@ -14,19 +14,19 @@
   },
   "M0_PREVIEW.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "db24a5913282558c8cc285412c49a88f421c00ed056a2663b613a1ef62d07925"
+    "staged_sha256": "0114cb1073b4037d6d4bd09e51a18b9dfe9c6c720586a6031cdd9a4574c35519"
   },
   "M0_PREVIEW.md": {
     "source": "public preview documentation",
-    "staged_sha256": "36a7b8e6f75b4f31946450b40a8bc71f8d6ff45c6314b65b27ecd4cd9d1a8a74"
+    "staged_sha256": "7a79042ea33daf51e04d3e16b831c6023b90b264e8fa5d9ef68b494bc355ca60"
   },
   "README.en.md": {
     "source": "public preview documentation",
-    "staged_sha256": "5d4e168b6e41cbc31702cb6a7032d6b4f8445b4573f444ca9ff8be918a70abdc"
+    "staged_sha256": "a87bd9e494d0b798131ed0a057c1e5b23ef73720f504885c60e556bd98ff905a"
   },
   "README.md": {
     "source": "public preview documentation",
-    "staged_sha256": "25a44a5ea97f9d1f9ef3954cd0b23554b54b466110c8f45a2fa445ee0e0aff19"
+    "staged_sha256": "6efa52ebb6febb37106552e73ac8cca9ee79632533fbb40da8dfbd03f1913eaa"
   },
   "dispatch/LICENSE": {
     "source": "dispatch/LICENSE",
@@ -1567,6 +1567,14 @@
     "source_sha256": "d18eaa9d34ed553c2b58b4ec137fcd7d7d52d63890880e7ae1fd486ab17bfdaf",
     "staged_sha256": "d18eaa9d34ed553c2b58b4ec137fcd7d7d52d63890880e7ae1fd486ab17bfdaf"
   },
+  "tools/m0_manager/README.en.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "b77dfba2e428372f3ffb9ca4e3c4a8d7414bbdd7acf963571fd050b30f5b2fc6"
+  },
+  "tools/m0_manager/README.md": {
+    "source": "public preview documentation",
+    "staged_sha256": "c1bda217b08b0670bfea57bf1ad78e76bd73af61c08815c2e5c91ecdc5ecd55d"
+  },
   "tools/m0_manager/__init__.py": {
     "source": "tools/m0_manager/__init__.py",
     "source_sha256": "4beb0cd6382a3333e9037c1d0d99899b6fed9c55e2d7f501cfda97a03bf24ba4",
@@ -1592,6 +1600,11 @@
     "source_sha256": "ad1d8d3f5d9cb25f79149a77ad764ed28734899e15e9385fca75c8d9f059f82e",
     "staged_sha256": "ad1d8d3f5d9cb25f79149a77ad764ed28734899e15e9385fca75c8d9f059f82e"
   },
+  "tools/m0_manager/campaign_handoff_source.py": {
+    "source": "tools/m0_manager/campaign_handoff_source.py",
+    "source_sha256": "f5eca4ceea7e82a2837f445bcfb547f737adb020f995b8e3f933386eb1a1bda0",
+    "staged_sha256": "f5eca4ceea7e82a2837f445bcfb547f737adb020f995b8e3f933386eb1a1bda0"
+  },
   "tools/m0_manager/content_sources.py": {
     "source": "tools/m0_manager/content_sources.py",
     "source_sha256": "b7c9dc2c62888d87dc3b0ef747784d74a00e5d4961afbe3fb73b2dba7f41f5bc",
@@ -1599,8 +1612,8 @@
   },
   "tools/m0_manager/dispatch_source.py": {
     "source": "tools/m0_manager/dispatch_source.py",
-    "source_sha256": "b2869f1a1647b833e3506113a79b1e5f26890d3c39f798c393dc667c1ae69613",
-    "staged_sha256": "b2869f1a1647b833e3506113a79b1e5f26890d3c39f798c393dc667c1ae69613"
+    "source_sha256": "c7f3f70d1aef4251f23e4cc470965cbb74c35935b9c8ae302584b2c08cc3a63a",
+    "staged_sha256": "c7f3f70d1aef4251f23e4cc470965cbb74c35935b9c8ae302584b2c08cc3a63a"
   },
   "tools/m0_manager/handoff_sources.py": {
     "source": "tools/m0_manager/handoff_sources.py",
@@ -1629,18 +1642,38 @@
   },
   "tools/m0_manager/manager.py": {
     "source": "tools/m0_manager/manager.py",
-    "source_sha256": "0305ff934d9ac6502896d187dee9a05b896f352f342d68bb2e3fea8bd245c531",
-    "staged_sha256": "0305ff934d9ac6502896d187dee9a05b896f352f342d68bb2e3fea8bd245c531"
+    "source_sha256": "b1380bbce11ca9cde18a71041531ab5afadb71f85f339b5786ccb455f1eefeae",
+    "staged_sha256": "b1380bbce11ca9cde18a71041531ab5afadb71f85f339b5786ccb455f1eefeae"
+  },
+  "tools/m0_manager/operational_sources.py": {
+    "source": "tools/m0_manager/operational_sources.py",
+    "source_sha256": "045fc0aa3ebbf5ac95a79bb83bd228d4069ba8f0f3faf6f7a368de7358e4c9d5",
+    "staged_sha256": "045fc0aa3ebbf5ac95a79bb83bd228d4069ba8f0f3faf6f7a368de7358e4c9d5"
   },
   "tools/m0_manager/readonly.py": {
     "source": "tools/m0_manager/readonly.py",
     "source_sha256": "a7d78d7fe0f6449a25097956edfd2ddee26fcfa13880e3c807fe9293cea15a64",
     "staged_sha256": "a7d78d7fe0f6449a25097956edfd2ddee26fcfa13880e3c807fe9293cea15a64"
   },
+  "tools/m0_manager/test_campaign_handoff_source.py": {
+    "source": "tools/m0_manager/test_campaign_handoff_source.py",
+    "source_sha256": "d27ff49899c4bd7282a7f1fbfc9dbb2be0f2c76196ac968bf3dfb20589e4950d",
+    "staged_sha256": "d27ff49899c4bd7282a7f1fbfc9dbb2be0f2c76196ac968bf3dfb20589e4950d"
+  },
   "tools/m0_manager/test_manager.py": {
     "source": "tools/m0_manager/test_manager.py",
     "source_sha256": "65f21c808ca8117e846fc32d8583b86a5e40dee19117a4169634ca152cf38019",
     "staged_sha256": "7fe1ca0b4461cf3478a202d6f0740e34a8fd79159e0b5e2f99644b1bc626f1ed"
+  },
+  "tools/m0_manager/test_operational_sources.py": {
+    "source": "tools/m0_manager/test_operational_sources.py",
+    "source_sha256": "7623705072f8d59f7d5084d75d92c819349e7de3d2a7d9593adc8954afcf4813",
+    "staged_sha256": "7623705072f8d59f7d5084d75d92c819349e7de3d2a7d9593adc8954afcf4813"
+  },
+  "tools/m0_manager/test_operations_routing.py": {
+    "source": "tools/m0_manager/test_operations_routing.py",
+    "source_sha256": "a588ada9e4cc9ea3b4c568740852a1cc029e26a5eebbb986fa0c8d811bc348b3",
+    "staged_sha256": "a588ada9e4cc9ea3b4c568740852a1cc029e26a5eebbb986fa0c8d811bc348b3"
   },
   "tools/m0_manager/test_protocol.py": {
     "source": "tools/m0_manager/test_protocol.py",

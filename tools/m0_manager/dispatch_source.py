@@ -104,6 +104,26 @@ def dispatch_query(source, op, args, role):
             counts = rows(db, 'SELECT status,COUNT(*) AS count FROM tasks GROUP BY status ORDER BY status')
             result['items'] = [{'kind': 'task_counts', 'counts': counts, 'state_basis': 'current', 'as_of': observed,
                                 'runtime_liveness': 'not_observed'}]
+        elif op == 'ops.snapshot':
+            if version != '0013':
+                raise SourceError('source_schema_unsupported')
+            from .operational_sources import operational_snapshot
+            item = operational_snapshot(db, source, observed)
+            result['items'] = [item]
+            result['unknown'] = item.get('unknown', [])
+            result['coverage'] = item.get('coverage', 'partial')
+            result['state_basis'] = item.get('state_basis', 'unknown')
+        elif op == 'handoff.get':
+            if version != '0013':
+                raise SourceError('source_schema_unsupported')
+            from .campaign_handoff_source import read_handoff
+            item = read_handoff(db, source_id=source['source_id'],
+                                handoff_id=args['handoff_id'], observed_at=observed)
+            result['items'] = [] if item is None else [item]
+            if item is not None:
+                result['unknown'] = item.get('unknown', [])
+                result['coverage'] = item.get('coverage', 'partial')
+                result['state_basis'] = item.get('state_basis', 'unknown')
         elif op in ('task.get', 'trace.get'):
             task_id = args['task_id']
             selected = rows(db, f'SELECT {TASK_FIELDS} FROM tasks WHERE task_id=?', (task_id,))

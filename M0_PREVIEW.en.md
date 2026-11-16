@@ -90,6 +90,8 @@ The shared ledger 0013 preview includes source for [timed producer and reviewer 
 
 The preview adds a [resident Collector for Debian](tools/m0_agent/COLLECTOR.en.md). A dedicated timer collects the three shared-ledger streams in bounded batches and reports recent health observations.
 
+Manager adds [operational and handoff queries](tools/m0_manager/README.en.md) for service health and single-handoff ledger evidence on an explicitly bound 0013 shared ledger.
+
 ## Sandbox and delivery progress
 
 An isolated Debian VM upgraded its shared ledger from 0012 to 0013. The same ledger recorded synthetic HTTP and local tasks and one authorized live DeepSeek task. After a VM reboot and a repeat installation, the model task still had one attempt and used quota was preserved.

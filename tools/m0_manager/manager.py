@@ -16,6 +16,8 @@ FIELDS = {
     'trace.get': {'source_id','task_id','trace_id','ref','limit'},
     'events.query': {'source_id','after_seq','limit'},
     'handoff.list': {'source_id','limit'},
+    'handoff.get': {'source_id','handoff_id'},
+    'ops.snapshot': {'source_id'},
     'attention.list': {'source_id','limit'},
     'inventory.search': {'source_id','q','limit','offset'},
     'inventory.get': {'source_id','id'},
@@ -25,7 +27,7 @@ FIELDS = {
     'content.status': {'source_id','trace_id','limit'},
 }
 OPS = {
-    'dispatch': {'status','task.get','trace.get','events.query','handoff.list','attention.list'},
+    'dispatch': {'status','task.get','trace.get','events.query','handoff.list','handoff.get','ops.snapshot','attention.list'},
     'inventory': {'inventory.search','inventory.get'},
     'knowledge': {'knowledge.search','knowledge.get','context.status'},
     'content': {'content.status','trace.get'},
@@ -58,10 +60,14 @@ def validate(request):
                 raise SourceError('E_ARGUMENT_INVALID')
         elif not isinstance(value,str) or not value or len(value)>1000:
             raise SourceError('E_ARGUMENT_INVALID')
-        elif key in ('source_id','task_id','trace_id','context_id') and not token(value):
+        elif key in ('source_id','task_id','trace_id','context_id','handoff_id') and not token(value):
             raise SourceError('E_ARGUMENT_INVALID')
     required = {'task.get':'task_id','inventory.get':'id','knowledge.search':'q','knowledge.get':'ref'}
     if op in required and required[op] not in args:
+        raise SourceError('E_ARGUMENT_REQUIRED')
+    if op in ('ops.snapshot','handoff.get') and 'source_id' not in args:
+        raise SourceError('E_ARGUMENT_REQUIRED')
+    if op == 'handoff.get' and 'handoff_id' not in args:
         raise SourceError('E_ARGUMENT_REQUIRED')
     if op=='trace.get' and ('task_id' in args)==('trace_id' in args):
         raise SourceError('E_ARGUMENT_REQUIRED')

@@ -90,6 +90,8 @@ python -B -m sa_dispatch selftest
 
 新增 [Debian 常驻 Collector](tools/m0_agent/COLLECTOR.md)。独立定时器在 0013 共同账本上分批维护三条事件流，并提供有界的健康观测。
 
+Manager 新增[运行状态与交接回读](tools/m0_manager/README.md)。在显式绑定的 0013 共同账本上查看服务健康和单条交接的账本证据。
+
 ## 沙盒与交付进度
 
 在一台隔离 Debian 虚拟机上，共同账本已从 0012 升级到 0013。同一本账记录了 HTTP 合成任务、本机合成任务和一个获准的真实 DeepSeek 任务。虚拟机重启和重复安装后，该模型任务仍只有一次尝试，已用额度未重置。

@@ -185,3 +185,12 @@ Shared ledger 0013 adds a resident Collector for Debian with bounded scheduled b
 - An isolated Debian VM automatically collected five new events. Neither lock contention case wrote to the ledger. Timed collection resumed after a normal reboot, and all three streams had zero lag.
 - Cold recovery matched seven tables and preserved seven original tasks, seven attempts, three handoffs, and the budgets. Additional model calls: zero.
 - The public candidate passed 63 tests on Windows with one Linux-only lock test skipped, and 61 on Debian. Both source package types were rebuilt and verified offline. A 24-hour soak and full-system delivery still need validation.
+
+## 0.1.1-m0.19 (2026-11-16)
+
+Manager adds read-only ops.snapshot and handoff.get for operational observations and single-handoff evidence on a shared 0013 ledger.
+
+- Both requests require an explicitly bound source. The existing protocol and operations remain compatible. Snapshot observations carry their own times. An idle on-demand local service is expected, and a missing permanent service stays unknown.
+- The handoff query verifies ledger hash linkage, reports partial coverage, and marks CAS content integrity as unchecked.
+- The stdin CLI checked service health and three existing handoff chains in an isolated Debian VM. Database and WAL bytes and modification times matched before and after. Additional model calls: zero.
+- The public candidate passed 47 tests on each of Windows and Debian. Native product session integration and 24-hour steady operation still need validation.
