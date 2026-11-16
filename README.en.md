@@ -64,6 +64,8 @@ The preview includes a [one-shot model task example](tools/m0_agent/README.en.md
 
 The one-shot worker can resume grants and time slots recorded by `0.1.1-m0.12`. Replaying a terminal task returns its original result or unknown status without another submission.
 
+The preview includes an [R1 installation rehearsal](tools/m0_installer/README.en.md) and a [local read-only status command](tools/m0_agent/READONLY_STATUS.en.md). Build a source-only rehearsal package to simulate one authorized slot in an isolated Debian environment and read task status, usage, and the result reference.
+
 ## Current status
 
 The public preview includes local examples and experimental maintenance tools. See [development updates](DEVELOPMENT_UPDATES.en.md) for the latest adapter and installation rehearsal progress.

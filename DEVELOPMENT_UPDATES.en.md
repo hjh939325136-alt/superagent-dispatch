@@ -125,3 +125,12 @@ The one-shot worker can resume grants and tasks recorded by 0.1.1-m0.12 and retu
 - Legacy calls keep their original grant and result formats. Explicit null mode is rejected, and a registered time slot cannot switch modes.
 - The tests use the original worker source to create synthetic ledgers and exercise queued work, a lost acknowledgement after commit, lease expiry, and terminal replay. Existing tasks retain their identity and attempt count.
 - The public package passed 69 tests on each of Windows and Debian with zero real model calls. Validation covers the portable worker and scheduler. The installer package has its own validation.
+
+## 0.1.1-m0.14 (2026-11-16)
+
+This release provides source for the R1 single-task simulation installer and a local read-only status command.
+
+- Build a rehearsal package from a clean checkout. On a dedicated Debian system, a separate systemd timer can rehearse one authorized time slot.
+- The local query returns task state, schedule time, usage, and the result reference. It leaves a missing ledger absent.
+- Remote credential delivery and the SSH query client are outside this release. They require separate receiver software and authorization.
+- Public source passed 93 tests on Debian. Windows passed 91 and skipped two POSIX-only cases. Both platforms rebuilt and verified the package offline. System installation, live SSH access, and real model calls have separate acceptance requirements.

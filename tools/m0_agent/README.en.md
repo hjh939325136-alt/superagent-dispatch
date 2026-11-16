@@ -10,6 +10,8 @@ These Python modules demonstrate how to bind one approved model task to a single
 
 Direct calls using the legacy interface keep the original grant and result formats and omit `execution_mode`. Task parameters that explicitly send null for the mode are rejected. An existing slot cannot switch modes. Queued tasks can still be claimed, and existing results and unknown outcomes can be read back.
 
+The preview includes an [R1 installation rehearsal](../m0_installer/README.en.md) and a [local read-only status command](READONLY_STATUS.en.md). Build a source-only rehearsal package to simulate one authorized slot in an isolated Debian environment and read task status, usage, and the result reference.
+
 ## Run the synthetic tests
 
 Use Python 3.11 or later. Run this from the preview source root:
