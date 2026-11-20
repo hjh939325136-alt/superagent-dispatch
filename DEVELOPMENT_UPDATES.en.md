@@ -221,3 +221,11 @@ Adds an isolated Hermes candidate comparison, known-response ledger reconciliati
 - A complete response and trusted forwarding receipt allow the original task, lease, and ledger to be reconciled with zero provider replays. Host conversation recovery requires separate acceptance.
 - A small live trial used two fixed-worker and 18 Hermes requests. Both passed two summary rounds. The fixed worker lacked retrieval capability, and ordinary retrieval did not deliver. After a transient failure, two current-version reads were verified, while the final output hit the 512-token limit.
 - The server denied restricted tools in both rounds. Denial wording still needs work. Conservative budget predictions blocked some later requests. The experiment stays separate from the default packages, and production adoption remains pending.
+
+## 0.1.1-m0.23 (2026-11-20)
+
+The first DEV trial exercises a disposable queue, worker credential rotation, and a clean rebuild.
+
+- The trial checks that dispatch and worker identities cannot substitute for each other.
+- Clients receive disposable test credentials via their process environment. After restart, the retired credential is rejected and the new one finishes the previously queued job.
+- A clean rebuild creates independent credentials and ledger state, and the trial cleans up its loopback service and temporary files.

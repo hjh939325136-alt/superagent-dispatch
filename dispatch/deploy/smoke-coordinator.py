@@ -4,6 +4,7 @@ import argparse
 from base64 import b64decode, b64encode
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import re
 from urllib.error import HTTPError
@@ -12,6 +13,7 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 
 CAPABILITY = "component:mgmtcore"
 SOURCE = b"synthetic coordinator smoke input\n"
+DEV_TOKEN_ENV = "SA_DISPATCH_DEV_TOKEN"
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -23,11 +25,14 @@ def digest(data):
     return "sha256:" + sha256(data).hexdigest()
 
 
-def client(port, token_path):
-    with token_path.open(encoding="ascii") as stream:
-        token = stream.read(1025).strip()
+def client(port, token_path=None):
+    if token_path is None:
+        token = os.environ.get(DEV_TOKEN_ENV, "")
+    else:
+        with token_path.open(encoding="ascii") as stream:
+            token = stream.read(1025).strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", token):
-        raise ValueError("expected a URL-safe token in the selected file")
+        raise ValueError("expected a URL-safe token from the selected credential source")
     opener = build_opener(ProxyHandler({}), NoRedirect())
 
     def call(route, body=None):
@@ -92,7 +97,10 @@ def main():
     actions = parser.add_subparsers(dest="action", required=True)
     for action, role in (("submit", "dispatcher"), ("complete", "worker")):
         command = actions.add_parser(action)
-        command.add_argument(f"--{role}-token-file", type=Path, dest="token", required=True)
+        credential = command.add_mutually_exclusive_group(required=True)
+        credential.add_argument(f"--{role}-token-file", type=Path, dest="token")
+        credential.add_argument(f"--{role}-token-env", action="store_true",
+                                help=f"use the disposable token in {DEV_TOKEN_ENV}")
         command.add_argument("--key", required=True)
         if action == "complete":
             command.add_argument("--task-id", required=True)

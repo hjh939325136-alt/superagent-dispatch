@@ -2,6 +2,14 @@
 
 This systemd package runs the Python dispatch coordinator and SQLite ledger for synthetic tasks. It uses a dedicated service account and IPv4 loopback port `8765`. The existing transport accepts explicit device credentials and supports a synthetic task/receipt handoff. Use Linux with systemd, `flock`, and system Python 3.11 or newer. The synthetic self-test also runs directly from source on other supported Python hosts.
 
+## Disposable development trial
+
+Run `python -B deploy/dev-trial.py` from `dispatch` with Python 3.11 or later. The trial starts an IPv4 loopback service on an ephemeral port, submits and completes synthetic work, then rotates the worker token and restarts the service. The old token is rejected and the new one completes the already queued work. A final run rebuilds from an empty directory with independent tokens.
+
+The trial passes each token to its client process via `SA_DISPATCH_DEV_TOKEN` using the smoke client's role-specific `--dispatcher-token-env` and `--worker-token-env` switches. Test tokens stay out of the result. The server receives token hashes and stores its trial data in temporary directories. The command needs no administrative privileges or external accounts and prints the receipts as JSON.
+
+## Systemd deployment
+
 1. From the `dispatch` directory, run `bash deploy/check-coordinator.sh` against the source release. Use a release ID such as the Git commit or release tag you verified.
 2. On the target host, run `sudo bash deploy/install-coordinator.sh RELEASE_ID`. This installs root-owned application files and the service unit, keeps existing `/etc/sa-dispatch` settings and `/var/lib/sa-dispatch` state, and leaves service activation to the operator.
 3. Provision device credentials. Generate long random tokens on a trusted machine and keep one protected file per device. The following example writes two new files and an identity file to a private temporary directory. Tokens stay out of stdout and the service identity file contains hashes only.

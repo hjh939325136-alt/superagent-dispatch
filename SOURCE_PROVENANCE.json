@@ -39,8 +39,8 @@
   },
   "dispatch/deploy/README.md": {
     "source": "dispatch/deploy/README.md",
-    "source_sha256": "be5989b8a5a5fdc00897401f3a9606a0674666b62814bf38130228cc57fe3194",
-    "staged_sha256": "be5989b8a5a5fdc00897401f3a9606a0674666b62814bf38130228cc57fe3194"
+    "source_sha256": "9a430a9cea30ad2386845ba0aff56333506c48ec8751d639d3dc630b1dcce773",
+    "staged_sha256": "9a430a9cea30ad2386845ba0aff56333506c48ec8751d639d3dc630b1dcce773"
   },
   "dispatch/deploy/backup-coordinator.sh": {
     "source": "dispatch/deploy/backup-coordinator.sh",
@@ -56,6 +56,11 @@
     "source": "dispatch/deploy/coordinator.example.toml",
     "source_sha256": "e636ec41d3053aaaed53be8dcb41c93e0ee9a5f6edb16843eb94a1da4f036fc8",
     "staged_sha256": "e636ec41d3053aaaed53be8dcb41c93e0ee9a5f6edb16843eb94a1da4f036fc8"
+  },
+  "dispatch/deploy/dev-trial.py": {
+    "source": "dispatch/deploy/dev-trial.py",
+    "source_sha256": "41fb0177c7f6d6c779566153a82366718a543d523e4f9683276dbfdd06843a1d",
+    "staged_sha256": "41fb0177c7f6d6c779566153a82366718a543d523e4f9683276dbfdd06843a1d"
   },
   "dispatch/deploy/identities.example.json": {
     "source": "dispatch/deploy/identities.example.json",
@@ -74,8 +79,8 @@
   },
   "dispatch/deploy/smoke-coordinator.py": {
     "source": "dispatch/deploy/smoke-coordinator.py",
-    "source_sha256": "9544e65025b2333aaae771d50d6e4c8d0d0dc6e43fb3c0e5bc955f38b0570503",
-    "staged_sha256": "9544e65025b2333aaae771d50d6e4c8d0d0dc6e43fb3c0e5bc955f38b0570503"
+    "source_sha256": "d3adb81c7e28336bbca0fe24e7afdcec3a36c1fe3c2166b11f95712fb01e79f8",
+    "staged_sha256": "d3adb81c7e28336bbca0fe24e7afdcec3a36c1fe3c2166b11f95712fb01e79f8"
   },
   "dispatch/docs/design/central_control.en.md": {
     "source": "public preview documentation",
